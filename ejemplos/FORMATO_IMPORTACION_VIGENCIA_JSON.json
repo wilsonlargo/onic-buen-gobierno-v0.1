@@ -1,0 +1,107 @@
+{
+  "schema": "onic-buen-gobierno.v1",
+  "vigencia": {
+    "nombre": "string",
+    "fecha_inicio": "YYYY-MM-DD",
+    "fecha_fin": "YYYY-MM-DD",
+    "lema": "string|null",
+    "descripcion": "string|null",
+    "estado": "borrador|activa|cerrada"
+  },
+  "fuentes_mandatos": [
+    {
+      "ref": "ref-local-unica",
+      "nombre": "string",
+      "descripcion": "string|null",
+      "orden": 0
+    }
+  ],
+  "mandatos": [
+    {
+      "ref": "ref-local-unica",
+      "fuente_ref": "ref de fuentes_mandatos|null",
+      "codigo": "string|null",
+      "titulo": "string|null",
+      "texto": "string",
+      "consejerias": [
+        "ref de consejeria"
+      ],
+      "estado": "activo|inactivo|archivado"
+    }
+  ],
+  "consejerias": [
+    {
+      "ref": "ref-local-unica",
+      "catalogo": {
+        "nombre_largo": "string",
+        "nombre_corto": "string",
+        "descripcion": "string|null",
+        "funciones": "string|null",
+        "icono_url": "string|null",
+        "orden": 0,
+        "estado": "activa|inactiva"
+      },
+      "participacion": {
+        "responsable": "string|null",
+        "pueblo": "string|null",
+        "detalle": "string|null",
+        "foto_url": "string|null",
+        "estado": "activa|inactiva"
+      },
+      "biblioteca": [],
+      "lineas": [
+        {
+          "nombre": "string",
+          "nombre_corto": "string|null",
+          "descripcion": "string|null",
+          "orden": 0,
+          "estado": "activa|inactiva|archivada",
+          "programas": [
+            {
+              "nombre": "string",
+              "descripcion": "string|null",
+              "estado": "activo|inactivo|archivado",
+              "proyectos": [
+                {
+                  "codigo": "string|null",
+                  "nombre": "string",
+                  "objetivo_general": "string|null",
+                  "ponderacion": "0..100; suma del Programa = 100",
+                  "mandatos": [
+                    "ref de mandato"
+                  ],
+                  "actividades": [
+                    {
+                      "codigo": "string|null",
+                      "nombre": "string",
+                      "estado": "borrador|programada|en_ejecucion|suspendida|completada|cancelada",
+                      "indicadores": [
+                        {
+                          "ref": "ref local dentro de la actividad",
+                          "nombre": "string",
+                          "linea_base": "number",
+                          "meta": "number",
+                          "sentido": "ascendente|descendente",
+                          "seguimientos": [
+                            {
+                              "fecha_corte": "YYYY-MM-DD",
+                              "valor": "number",
+                              "observacion": "string|null"
+                            }
+                          ]
+                        }
+                      ],
+                      "presupuesto": [],
+                      "evidencias": [],
+                      "seguimientos": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+:root {
+  /* Paleta inicial tomada como referencia de la pieza institucional compartida.
+     Se puede ajustar cuando contemos con el manual oficial de identidad visual. */
+  --onic-green-900: #0f4230;
+  --onic-green-800: #114632;
+  --onic-green-700: #1c4d39;
+  --onic-red-700: #a30c22;
+  --onic-sage-500: #728266;
+  --onic-cream-300: #bcbd9e;
+
+  --bg: #f5f5f0;
+  --surface: #ffffff;
+  --surface-soft: #eef0e8;
+  --text: #17221d;
+  --text-soft: #66716b;
+  --border: #d9ded8;
+  --danger: #a30c22;
+  --success: #1c6b4b;
+
+  --shadow-sm: 0 3px 14px rgba(15, 66, 48, 0.08);
+  --shadow-md: 0 16px 40px rgba(15, 66, 48, 0.14);
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+
+  --sidebar-width: 250px;
+  --transition: 160ms ease;
+}
