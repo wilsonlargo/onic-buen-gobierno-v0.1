@@ -47,9 +47,21 @@ button {
   gap: 72px;
   align-items: center;
   padding: clamp(28px, 5vw, 80px);
-  background:
-    linear-gradient(120deg, rgba(15, 66, 48, 0.98), rgba(17, 70, 50, 0.91)),
-    radial-gradient(circle at 20% 20%, rgba(188, 189, 158, 0.35), transparent 38%);
+
+  /* Imagen institucional como marca de agua de la pantalla inicial */
+  background-image:
+    linear-gradient(
+      120deg,
+      rgba(9, 48, 36, 0.76),
+      rgba(15, 66, 48, 0.64)
+    ),
+    url("../assets/branding/fondo-inicio-onic.png");
+
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+
   color: #fff;
 }
 
@@ -4676,5 +4688,40 @@ button {
   .document-format-grid,
   .document-report-features > div {
     grid-template-columns: 1fr;
+  }
+}
+
+
+/* ==========================================================
+   FONDO INSTITUCIONAL DE INGRESO · v0.9.2
+   ========================================================== */
+
+.login-brand {
+  position: relative;
+  z-index: 1;
+  padding: 24px;
+  border-radius: 18px;
+  background: rgba(8, 38, 29, 0.16);
+  backdrop-filter: blur(1.5px);
+}
+
+.login-card {
+  position: relative;
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(6px);
+}
+
+@media (max-width: 820px) {
+  .login-view {
+    background-attachment: scroll;
+    background-position: 44% center;
+  }
+}
+
+@media (max-width: 620px) {
+  .login-brand {
+    padding: 16px;
+    background: rgba(8, 38, 29, 0.24);
   }
 }

@@ -1,35 +1,27 @@
-# ONIC Buen Gobierno — v0.9.1
+# ONIC Buen Gobierno — v0.9.2 · Fondo institucional de ingreso
 
-## Cambio principal
+Esta actualización incorpora la imagen suministrada como fondo de la pantalla
+inicial de acceso.
 
-La generación documental ya no expone LaTeX al usuario.
+## Comportamiento
 
-El flujo es:
+La imagen:
 
-```text
-Generar documento
-→ Descargar PDF
-→ Descargar Word
-```
+- ocupa toda la pantalla de ingreso;
+- mantiene su proporción mediante `background-size: cover`;
+- funciona como marca de agua mediante una capa institucional semitransparente;
+- conserva la legibilidad del logo, título y formulario;
+- no altera el fondo de la aplicación una vez iniciado sesión;
+- se adapta a pantallas pequeñas.
 
-## No requiere SQL nuevo
+## No requiere SQL
 
 ## Reemplazar
 
 ```text
 index.html
 css/styles.css
-js/modules/documentReports.js
-js/modules/inicio.js
-js/modules/vigencias.js
-js/modules/consejeriaWorkspace.js
-js/modules/proyectoWorkspace.js
-```
-
-Eliminar, si todavía existe:
-
-```text
-js/modules/latexReports.js
+assets/branding/fondo-inicio-onic.png
 ```
 
 No reemplazar:
@@ -43,17 +35,3 @@ Después:
 ```text
 Ctrl + Shift + R
 ```
-
-## Alcances disponibles
-
-- Vigencia completa
-- Consejería completa
-- Proyecto completo
-
-## PDF
-
-Se genera directamente en el navegador como `.pdf`.
-
-## Word
-
-Se genera directamente en el navegador como `.docx` editable.
