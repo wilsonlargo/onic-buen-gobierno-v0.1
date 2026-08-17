@@ -1,4 +1,0 @@
-La versión v0.9.1 ya no utiliza LaTeX.
-Si todavía existe en tu proyecto, elimina:
-
-js/modules/latexReports.js
