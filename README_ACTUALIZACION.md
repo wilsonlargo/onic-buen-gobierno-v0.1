@@ -1,27 +1,83 @@
-# ONIC Buen Gobierno — v0.9.2 · Fondo institucional de ingreso
+# ONIC Buen Gobierno — v0.9.3
+## Avance del Plan por Consejería
 
-Esta actualización incorpora la imagen suministrada como fondo de la pantalla
-inicial de acceso.
+Esta actualización hace visible el avance técnico de cada Consejería
+dentro de la Vigencia.
 
-## Comportamiento
+## Qué se agrega
 
-La imagen:
+En las tarjetas de Consejerías vinculadas:
 
-- ocupa toda la pantalla de ingreso;
-- mantiene su proporción mediante `background-size: cover`;
-- funciona como marca de agua mediante una capa institucional semitransparente;
-- conserva la legibilidad del logo, título y formulario;
-- no altera el fondo de la aplicación una vez iniciado sesión;
-- se adapta a pantallas pequeñas.
+```text
+Avance del Plan
+XX,XX %
+Estado del avance
 
-## No requiere SQL
+Cobertura de medición
+XX,XX %
+```
 
-## Reemplazar
+En `Abrir Consejería` también aparecen:
+
+```text
+Avance del Plan
+Cobertura de medición
+Mandatos asignados
+Biblioteca
+Pueblo
+```
+
+## Regla de cálculo
+
+No se crea un porcentaje manual.
+
+Se utiliza exactamente la misma lógica jerárquica del tablero Inicio:
+
+```text
+Indicadores
+→ Actividades
+→ Proyectos
+→ Programas
+→ Líneas de Acción
+→ Consejería
+```
+
+- Las Actividades tienen peso técnico automático.
+- Los Proyectos utilizan su ponderación manual dentro del Programa.
+- Los Programas activos se ponderan automáticamente dentro de la Línea.
+- Las Líneas activas se ponderan automáticamente dentro de la Consejería.
+- La cobertura indica qué proporción de la estructura tiene medición válida.
+- Una Consejería inactiva queda fuera del cálculo.
+- Si no existe cobertura de medición se muestra `—` y `Sin medición`.
+
+## Estado visual
+
+```text
+Menos de 40 %       → Avance bajo
+40 % a 69,99 %      → En proceso
+70 % a 89,99 %      → Avance favorable
+90 % o más          → Avance alto
+Sin cobertura       → Sin medición
+Consejería inactiva → Fuera del cálculo
+```
+
+## Instalación
+
+No requiere SQL.
+
+Reemplazar:
 
 ```text
 index.html
 css/styles.css
-assets/branding/fondo-inicio-onic.png
+js/modules/consejerias.js
+js/modules/consejeriaWorkspace.js
+```
+
+Agregar:
+
+```text
+js/modules/consejeriaProgress.js
 ```
 
 No reemplazar:

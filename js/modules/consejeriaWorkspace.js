@@ -2,6 +2,10 @@ import { requireSupabase } from "../supabaseClient.js";
 import { openModal, closeModal } from "../components/modal.js";
 import { setAuditContext } from "./auditoria.js";
 import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js";
+import {
+  formatConsejeriaProgress,
+  getConsejeriaProgressState
+} from "./consejeriaProgress.js";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -883,7 +887,8 @@ export async function renderConsejeriaWorkspace(
     record,
     onBack,
     onChanged,
-    initialTab = "perfil"
+    initialTab = "perfil",
+    progressMetric = null
   }
 ) {
   let currentRecord = { ...record };
@@ -932,6 +937,26 @@ export async function renderConsejeriaWorkspace(
     const c = currentRecord.consejerias || {};
     const fallback =
       initials(currentRecord.responsable || c.nombre_corto);
+
+    const metric =
+      progressMetric || {
+        progress: 0,
+        coverage: 0,
+        active:
+          currentRecord.estado ===
+          "activa"
+      };
+
+    const progressState =
+      getConsejeriaProgressState(
+        metric
+      );
+
+    const hasMeasurement =
+      metric.active !== false &&
+      Number(
+        metric.coverage || 0
+      ) > 0;
 
     return `
       <div class="consejeria-workspace-title">
@@ -984,6 +1009,63 @@ export async function renderConsejeriaWorkspace(
       </div>
 
       <div class="consejeria-workspace-metrics">
+        <div
+          class="consejeria-progress-metric ${escapeHTML(progressState.key)}"
+          style="--vc-progress-color: ${escapeHTML(progressState.color)}"
+        >
+          <span>Avance del Plan</span>
+
+          <strong>
+            ${
+              hasMeasurement
+                ? formatConsejeriaProgress(
+                    metric.progress
+                  )
+                : "—"
+            }
+          </strong>
+
+          <small>
+            ${escapeHTML(progressState.label)}
+          </small>
+        </div>
+
+        <div class="consejeria-coverage-metric">
+          <span>Cobertura de medición</span>
+
+          <strong>
+            ${
+              metric.active === false
+                ? "—"
+                : formatConsejeriaProgress(
+                    metric.coverage
+                  )
+            }
+          </strong>
+
+          <div
+            class="consejeria-coverage-bar"
+            aria-hidden="true"
+          >
+            <i
+              style="width: ${
+                metric.active === false
+                  ? 0
+                  : Math.max(
+                      0,
+                      Math.min(
+                        100,
+                        Number(
+                          metric.coverage ||
+                          0
+                        )
+                      )
+                    )
+              }%"
+            ></i>
+          </div>
+        </div>
+
         <div>
           <span>Mandatos asignados</span>
           <strong>${assignedMandateIds.length}</strong>

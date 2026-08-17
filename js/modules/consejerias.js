@@ -1,6 +1,11 @@
 import { requireSupabase } from "../supabaseClient.js";
 import { openModal, closeModal } from "../components/modal.js";
 import { renderConsejeriaWorkspace } from "./consejeriaWorkspace.js";
+import {
+  getConsejeriaProgressMap,
+  formatConsejeriaProgress,
+  getConsejeriaProgressState
+} from "./consejeriaProgress.js";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -896,6 +901,7 @@ export async function renderConsejerias(container, navigationTarget = null) {
   let vigencias = [];
   let catalogo = [];
   let selectedVigenciaId = "";
+  let progressMetrics = new Map();
 
   container.innerHTML = `
     <div class="page-actions">
@@ -1078,6 +1084,8 @@ export async function renderConsejerias(container, navigationTarget = null) {
       vigencia,
       record,
       initialTab,
+      progressMetric:
+        progressMetrics.get(record.id) || null,
 
       onChanged: async () => {
         catalogo = await getConsejerias();
@@ -1109,7 +1117,20 @@ export async function renderConsejerias(container, navigationTarget = null) {
     linkedContainer.innerHTML = `<div class="empty-state">Cargando consejerías de la vigencia…</div>`;
 
     try {
-      const vinculadas = await getVigenciaConsejerias(selectedVigenciaId);
+      const [
+        vinculadas,
+        loadedProgressMetrics
+      ] = await Promise.all([
+        getVigenciaConsejerias(
+          selectedVigenciaId
+        ),
+        getConsejeriaProgressMap(
+          selectedVigenciaId
+        )
+      ]);
+
+      progressMetrics =
+        loadedProgressMetrics;
 
       if (!vinculadas.length) {
         linkedContainer.innerHTML = `
@@ -1125,7 +1146,33 @@ export async function renderConsejerias(container, navigationTarget = null) {
         <div class="vigencia-consejerias-grid">
           ${vinculadas.map((item) => {
             const c = item.consejerias || {};
-            const personFallback = initials(item.responsable || c.nombre_corto || "ON");
+            const personFallback = initials(
+              item.responsable ||
+              c.nombre_corto ||
+              "ON"
+            );
+
+            const metric =
+              progressMetrics.get(
+                item.id
+              ) || {
+                progress: 0,
+                coverage: 0,
+                active:
+                  item.estado ===
+                  "activa"
+              };
+
+            const progressState =
+              getConsejeriaProgressState(
+                metric
+              );
+
+            const hasMeasurement =
+              metric.active !== false &&
+              Number(
+                metric.coverage || 0
+              ) > 0;
 
             return `
               <article class="vigencia-consejeria-card ${item.estado === "inactiva" ? "is-inactive" : ""}">
@@ -1169,6 +1216,63 @@ export async function renderConsejerias(container, navigationTarget = null) {
                   <div class="vc-data">
                     <span>Pueblo</span>
                     <strong>${escapeHTML(item.pueblo || "Sin registrar")}</strong>
+                  </div>
+
+                  <div
+                    class="vc-data vc-plan-progress ${escapeHTML(progressState.key)}"
+                    style="--vc-progress-color: ${escapeHTML(progressState.color)}"
+                  >
+                    <span>Avance del Plan</span>
+
+                    <strong>
+                      ${
+                        hasMeasurement
+                          ? formatConsejeriaProgress(
+                              metric.progress
+                            )
+                          : "—"
+                      }
+                    </strong>
+
+                    <small>
+                      ${escapeHTML(progressState.label)}
+                    </small>
+                  </div>
+
+                  <div class="vc-data vc-coverage-data">
+                    <span>Cobertura de medición</span>
+
+                    <strong>
+                      ${
+                        metric.active === false
+                          ? "—"
+                          : formatConsejeriaProgress(
+                              metric.coverage
+                            )
+                      }
+                    </strong>
+
+                    <div
+                      class="vc-coverage-bar"
+                      aria-hidden="true"
+                    >
+                      <span
+                        style="width: ${
+                          metric.active === false
+                            ? 0
+                            : Math.max(
+                                0,
+                                Math.min(
+                                  100,
+                                  Number(
+                                    metric.coverage ||
+                                    0
+                                  )
+                                )
+                              )
+                        }%"
+                      ></span>
+                    </div>
                   </div>
 
                   ${item.detalle

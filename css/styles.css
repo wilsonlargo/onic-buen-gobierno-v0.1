@@ -4725,3 +4725,152 @@ button {
     background: rgba(8, 38, 29, 0.24);
   }
 }
+
+
+/* ==========================================================
+   AVANCE DEL PLAN POR CONSEJERÍA · v0.9.3
+   ========================================================== */
+
+.vc-plan-progress {
+  position: relative;
+  overflow: hidden;
+  border-color:
+    color-mix(
+      in srgb,
+      var(--vc-progress-color) 24%,
+      var(--border)
+    );
+  background:
+    color-mix(
+      in srgb,
+      var(--vc-progress-color) 7%,
+      var(--surface-soft)
+    );
+}
+
+.vc-plan-progress::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background:
+    var(--vc-progress-color);
+}
+
+.vc-plan-progress strong {
+  color:
+    var(--vc-progress-color);
+  font-size: 1.05rem;
+}
+
+.vc-plan-progress small {
+  display: block;
+  margin-top: 3px;
+  color:
+    var(--vc-progress-color);
+  font-size: 0.64rem;
+  font-weight: 800;
+}
+
+.vc-coverage-data strong {
+  color: var(--onic-green-900);
+}
+
+.vc-coverage-bar,
+.consejeria-coverage-bar {
+  width: 100%;
+  height: 6px;
+  margin-top: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e3e8e1;
+}
+
+.vc-coverage-bar > span,
+.consejeria-coverage-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--onic-green-800);
+}
+
+.consejeria-workspace-metrics {
+  grid-template-columns:
+    repeat(5, minmax(0, 1fr));
+}
+
+.consejeria-workspace-metrics
+  > .consejeria-progress-metric {
+  position: relative;
+  overflow: hidden;
+  border-color:
+    color-mix(
+      in srgb,
+      var(--vc-progress-color) 24%,
+      rgba(0,0,0,.07)
+    );
+  background:
+    color-mix(
+      in srgb,
+      var(--vc-progress-color) 7%,
+      rgba(255,255,255,.78)
+    );
+}
+
+.consejeria-workspace-metrics
+  > .consejeria-progress-metric::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background:
+    var(--vc-progress-color);
+}
+
+.consejeria-workspace-metrics
+  > .consejeria-progress-metric
+  strong {
+  color:
+    var(--vc-progress-color);
+  font-size: 1.08rem;
+}
+
+.consejeria-workspace-metrics small {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-soft);
+  font-size: 0.61rem;
+  line-height: 1.25;
+}
+
+.consejeria-workspace-metrics
+  > .consejeria-progress-metric
+  small {
+  color:
+    var(--vc-progress-color);
+  font-weight: 800;
+}
+
+.consejeria-coverage-metric strong {
+  color: var(--onic-green-900);
+}
+
+@media (max-width: 1180px) {
+  .consejeria-workspace-metrics {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .consejeria-workspace-metrics {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .consejeria-workspace-metrics {
+    grid-template-columns: 1fr;
+  }
+}
