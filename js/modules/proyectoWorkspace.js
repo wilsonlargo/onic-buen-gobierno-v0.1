@@ -881,7 +881,7 @@ export async function renderProyectoWorkspace(container, options) {
             <div class="form-field"><label>Fecha de inicio</label><input name="fecha_inicio" type="date" value="${escapeHTML(project.fecha_inicio || "")}"></div>
             <div class="form-field"><label>Fecha de cierre</label><input name="fecha_fin" type="date" value="${escapeHTML(project.fecha_fin || "")}"></div>
             <div class="form-field"><label>Estado</label><select name="estado">${option("borrador", "Borrador", project.estado === "borrador")}${option("formulacion", "Formulación", project.estado === "formulacion")}${option("activo", "Activo", project.estado === "activo")}${option("suspendido", "Suspendido", project.estado === "suspendido")}${option("cerrado", "Cerrado", project.estado === "cerrado")}</select></div>
-            <div class="form-field"><label>Ponderación dentro del Programa</label><div class="percent-input"><input name="ponderacion" type="number" min="0" max="100" step="0.01" value="${Number(project.ponderacion || 0).toFixed(2)}"><span>%</span></div></div>
+            <div class="form-field"><label>Ponderación dentro del Programa</label><div class="percent-input"><input name="ponderacion" type="number" min="0" max="100" step="0.01" value="${Number(project.ponderacion || 0).toFixed(2)}" readonly><span>%</span></div><small class="field-help">Se administra y aprueba desde el módulo Ponderaciones.</small></div>
             <div class="form-field"><label>Orden</label><input name="orden" type="number" min="0" step="1" value="${Number(project.orden || 0)}"></div>
           </div>
         </section>

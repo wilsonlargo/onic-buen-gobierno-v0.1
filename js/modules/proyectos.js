@@ -797,12 +797,13 @@ function openProyectoForm({
                 max="100"
                 step="0.01"
                 value="${Number(record?.ponderacion || 0).toFixed(2)}"
+                readonly
               >
               <span>%</span>
             </div>
 
             <small class="field-help">
-              Es editable. La suma de los Proyectos del Programa debe ser 100 %.
+              Se administra desde el módulo Ponderaciones y solo cambia al aprobar la propuesta de la Consejería.
             </small>
           </div>
 
@@ -2986,21 +2987,40 @@ export async function renderProyectos(container, navigationTarget = null) {
   weightsButton.addEventListener(
     "click",
     () => {
-      const programa = currentPrograma();
+      const vigencia = currentVigencia();
+      const vc = currentConsejeria();
+      if (!vigencia || !vc) return;
 
-      if (!programa || !proyectos.length) {
+      sessionStorage.setItem(
+        "onic_ponderaciones_target",
+        JSON.stringify({
+          vigencia_id: vigencia.id,
+          vigencia_consejeria_id: vc.id
+        })
+      );
+
+      const navButton = document.querySelector(
+        '.nav-item[data-view="ponderaciones"]'
+      );
+
+      if (navButton) {
+        navButton.click();
         return;
       }
 
-      openWeightsDialog({
-        programa,
-        proyectos,
-
-        onSaved: async () => {
-          await refreshProjects();
-          showToast("Ponderaciones actualizadas.");
-        }
+      openModal({
+        title: "Ponderaciones",
+        content: `
+          <div class="danger-callout soft">
+            <strong>La ponderación se administra desde el módulo Ponderaciones.</strong>
+            <p>Allí los cambios se preparan como borrador y solo se guardan al aprobar la propuesta completa de la Consejería.</p>
+          </div>
+          <div class="form-actions">
+            <button id="closeWeightsInfo" class="btn btn-secondary" type="button">Cerrar</button>
+          </div>
+        `
       });
+      document.querySelector("#closeWeightsInfo")?.addEventListener("click", closeModal);
     }
   );
 

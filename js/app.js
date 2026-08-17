@@ -6,6 +6,7 @@ import { renderMandatos } from "./modules/mandatos.js";
 import { renderLineas } from "./modules/lineas.js";
 import { renderProgramas } from "./modules/programas.js";
 import { renderProyectos } from "./modules/proyectos.js";
+import { renderPonderaciones } from "./modules/ponderaciones.js";
 import { initAuditoria, clearAuditContext } from "./modules/auditoria.js";
 
 const loginView = document.querySelector("#loginView");
@@ -46,6 +47,10 @@ const views = {
   proyectos: {
     title: "Proyectos",
     render: renderProyectos
+  },
+  ponderaciones: {
+    title: "Ponderaciones",
+    render: renderPonderaciones
   }
 };
 

@@ -1,93 +1,65 @@
-# ONIC Buen Gobierno — v0.9.3
-## Avance del Plan por Consejería
+# ONIC Buen Gobierno — v0.10.0 · Ponderaciones por Consejería
 
-Esta actualización hace visible el avance técnico de cada Consejería
-dentro de la Vigencia.
-
-## Qué se agrega
-
-En las tarjetas de Consejerías vinculadas:
-
-```text
-Avance del Plan
-XX,XX %
-Estado del avance
-
-Cobertura de medición
-XX,XX %
-```
-
-En `Abrir Consejería` también aparecen:
-
-```text
-Avance del Plan
-Cobertura de medición
-Mandatos asignados
-Biblioteca
-Pueblo
-```
-
-## Regla de cálculo
-
-No se crea un porcentaje manual.
-
-Se utiliza exactamente la misma lógica jerárquica del tablero Inicio:
-
-```text
-Indicadores
-→ Actividades
-→ Proyectos
-→ Programas
-→ Líneas de Acción
-→ Consejería
-```
-
-- Las Actividades tienen peso técnico automático.
-- Los Proyectos utilizan su ponderación manual dentro del Programa.
-- Los Programas activos se ponderan automáticamente dentro de la Línea.
-- Las Líneas activas se ponderan automáticamente dentro de la Consejería.
-- La cobertura indica qué proporción de la estructura tiene medición válida.
-- Una Consejería inactiva queda fuera del cálculo.
-- Si no existe cobertura de medición se muestra `—` y `Sin medición`.
-
-## Estado visual
-
-```text
-Menos de 40 %       → Avance bajo
-40 % a 69,99 %      → En proceso
-70 % a 89,99 %      → Avance favorable
-90 % o más          → Avance alto
-Sin cobertura       → Sin medición
-Consejería inactiva → Fuera del cálculo
-```
+Nueva sección independiente **Ponderaciones**.
 
 ## Instalación
 
-No requiere SQL.
+1. Ejecutar una sola vez en Supabase:
 
-Reemplazar:
+```text
+sql/014_ponderaciones_consejeria.sql
+```
+
+No volver a ejecutar 001–013.
+
+2. Reemplazar:
 
 ```text
 index.html
 css/styles.css
-js/modules/consejerias.js
-js/modules/consejeriaWorkspace.js
+js/app.js
+js/modules/proyectos.js
+js/modules/proyectoWorkspace.js
 ```
 
-Agregar:
+3. Agregar:
 
 ```text
-js/modules/consejeriaProgress.js
+js/modules/ponderaciones.js
 ```
 
-No reemplazar:
+No reemplazar `js/config.js`. Después usar `Ctrl + Shift + R`.
 
-```text
-js/config.js
-```
+## Funcionamiento
 
-Después:
+- Selección Vigencia → Consejería.
+- Muestra Línea → Programa → Proyecto en una sola pantalla.
+- Líneas y Programas conservan ponderación automática.
+- Los Proyectos son editables.
+- Los cambios son borrador y NO se guardan durante la edición.
+- **Ponderación sugerida** distribuye equitativamente el 100 % dentro de cada Programa.
+- **Completar restante** ayuda a cerrar el porcentaje faltante.
+- **Restablecer** recupera los valores oficialmente guardados.
+- Cada Programa debe sumar exactamente 100 %.
+- La aprobación exige una **Descripción / criterio de la ponderación**.
+- Solo **Aprobar ponderación** actualiza la base de datos. La actualización se hace en una transacción SQL.
+- Se registra fecha, usuario, descripción y snapshot de cada aprobación.
+- Las aprobaciones forman parte de la copia de seguridad/restauración de la Vigencia.
 
-```text
-Ctrl + Shift + R
-```
+## Auditoría
+
+Se incluyen botones **Nota** en:
+
+- Consejería (proceso general de ponderación)
+- Programa
+- Proyecto
+
+Las notas utilizan el módulo de Auditoría existente y `Ir a referencia` vuelve a Ponderaciones y resalta el elemento correspondiente.
+
+## Cambio en Proyectos
+
+El botón Ponderaciones del módulo Proyectos ya no guarda porcentajes directamente; ahora redirige al nuevo módulo para impedir que se omita el proceso de aprobación.
+
+## Control de edición
+
+La ponderación queda de solo lectura en los formularios de Proyecto. Los ajustes oficiales se realizan desde el nuevo módulo **Ponderaciones**, evitando guardar porcentajes por fuera del flujo de aprobación.
