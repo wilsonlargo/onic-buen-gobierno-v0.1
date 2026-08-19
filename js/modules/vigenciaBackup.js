@@ -1,4 +1,5 @@
 import { requireSupabase } from "../supabaseClient.js";
+import { logManualEvent } from "../security.js";
 import { openModal, closeModal } from "../components/modal.js";
 
 function escapeHTML(value = "") {
@@ -152,6 +153,15 @@ export function openVigenciaBackupDialog({
         `copia_seguridad_${safeFilename(vigencia.nombre)}_${todayStamp()}.json`;
 
       downloadJSON(payload, filename);
+
+      await logManualEvent({
+        action: "generar_respaldo",
+        entityType: "Vigencia",
+        entityId: vigencia.id,
+        entityName: vigencia.nombre,
+        vigenciaId: vigencia.id,
+        detail: { archivo: filename }
+      });
 
       openModal({
         title: "Copia de seguridad generada",

@@ -7,14 +7,28 @@ import { renderLineas } from "./modules/lineas.js";
 import { renderProgramas } from "./modules/programas.js";
 import { renderProyectos } from "./modules/proyectos.js";
 import { renderPonderaciones } from "./modules/ponderaciones.js";
+import { renderHistorial } from "./modules/historial.js";
+import { renderUsuarios } from "./modules/usuarios.js";
 import { initAuditoria, clearAuditContext } from "./modules/auditoria.js";
+import {
+  loadCurrentUserProfile,
+  clearSecuritySession,
+  roleLabel,
+  canManageUsers,
+  canViewHistory,
+  applyNavigationPermissions,
+  applyViewPermissions,
+  startPermissionObserver,
+  logSessionEvent
+} from "./security.js";
 
 const loginView = document.querySelector("#loginView");
 const appView = document.querySelector("#appView");
 const loginForm = document.querySelector("#loginForm");
 const loginMessage = document.querySelector("#loginMessage");
 const logoutButton = document.querySelector("#logoutButton");
-const userEmail = document.querySelector("#userEmail");
+const userDisplayName = document.querySelector("#userDisplayName");
+const userRoleLabel = document.querySelector("#userRoleLabel");
 const pageTitle = document.querySelector("#pageTitle");
 const mainContent = document.querySelector("#mainContent");
 const mainNav = document.querySelector("#mainNav");
@@ -22,39 +36,19 @@ const sidebar = document.querySelector(".sidebar");
 const mobileMenuButton = document.querySelector("#mobileMenuButton");
 const mobileNavScrim = document.querySelector("#mobileNavScrim");
 
+let currentViewName = "inicio";
+
 const views = {
-  inicio: {
-    title: "Inicio",
-    render: renderInicio
-  },
-  vigencias: {
-    title: "Vigencias",
-    render: renderVigencias
-  },
-  mandatos: {
-    title: "Mandatos",
-    render: renderMandatos
-  },
-  consejerias: {
-    title: "Consejerías",
-    render: renderConsejerias
-  },
-  lineas: {
-    title: "Líneas de Acción",
-    render: renderLineas
-  },
-  programas: {
-    title: "Programas",
-    render: renderProgramas
-  },
-  proyectos: {
-    title: "Proyectos",
-    render: renderProyectos
-  },
-  ponderaciones: {
-    title: "Ponderaciones",
-    render: renderPonderaciones
-  }
+  inicio: { title: "Inicio", render: renderInicio },
+  vigencias: { title: "Vigencias", render: renderVigencias },
+  mandatos: { title: "Mandatos", render: renderMandatos },
+  consejerias: { title: "Consejerías", render: renderConsejerias },
+  lineas: { title: "Líneas de Acción", render: renderLineas },
+  programas: { title: "Programas", render: renderProgramas },
+  proyectos: { title: "Proyectos", render: renderProyectos },
+  ponderaciones: { title: "Ponderaciones", render: renderPonderaciones },
+  historial: { title: "Historial", render: renderHistorial },
+  usuarios: { title: "Usuarios", render: renderUsuarios }
 };
 
 function isMobileLayout() {
@@ -80,28 +74,59 @@ function loginErrorMessage(error) {
 }
 
 function showLogin(message = "") {
+  clearSecuritySession();
   loginView.classList.remove("hidden");
   appView.classList.add("hidden");
   loginMessage.textContent = message;
 }
 
-async function showApp(session) {
-  loginView.classList.add("hidden");
-  appView.classList.remove("hidden");
-  userEmail.textContent = session?.user?.email || "Usuario";
+function viewAllowed(viewName) {
+  if (viewName === "usuarios") return canManageUsers();
+  if (viewName === "historial") return canViewHistory();
+  return true;
+}
 
-  initAuditoria({
-    onNavigate: async (target) => {
-      await navigate(target.view || "inicio", target);
+async function showApp(session, { registerLogin = false } = {}) {
+  try {
+    const profile = await loadCurrentUserProfile(session);
+
+    if (profile.estado !== "activo") {
+      await supabaseClient.auth.signOut();
+      showLogin("Tu acceso al Sistema está inactivo. Contacta al Administrador.");
+      return;
     }
-  });
 
-  await navigate("inicio");
+    loginView.classList.add("hidden");
+    appView.classList.remove("hidden");
+
+    userDisplayName.textContent = profile.nombre || profile.email || "Usuario";
+    userRoleLabel.textContent = roleLabel(profile.rol);
+    userDisplayName.title = profile.email || "";
+
+    applyNavigationPermissions(document);
+    startPermissionObserver(mainContent, () => currentViewName);
+
+    initAuditoria({
+      onNavigate: async (target) => {
+        await navigate(target.view || "inicio", target);
+      }
+    });
+
+    if (registerLogin) await logSessionEvent("iniciar_sesion");
+    await navigate("inicio");
+  } catch (error) {
+    console.error(error);
+    await supabaseClient?.auth?.signOut();
+    showLogin(error.message || "No fue posible validar tus permisos de acceso.");
+  }
 }
 
 async function navigate(viewName, navigationTarget = null) {
+  if (!viewAllowed(viewName)) viewName = "inicio";
   const selected = views[viewName];
   if (!selected) return;
+
+  currentViewName = viewName;
 
   document.querySelectorAll(".nav-item").forEach((item) => {
     item.classList.toggle("active", item.dataset.view === viewName);
@@ -113,6 +138,7 @@ async function navigate(viewName, navigationTarget = null) {
 
   try {
     await selected.render(mainContent, navigationTarget);
+    applyViewPermissions(viewName, mainContent);
     mainContent.focus({ preventScroll: true });
   } catch (error) {
     console.error(error);
@@ -120,7 +146,7 @@ async function navigate(viewName, navigationTarget = null) {
       <section class="panel" style="margin-top: 0">
         <p class="eyebrow">Error</p>
         <h2>No fue posible cargar el módulo</h2>
-        <p class="muted">Intenta nuevamente. Si el problema continúa, informa al administrador del Sistema.</p>
+        <p class="muted">${String(error?.message || "Intenta nuevamente. Si el problema continúa, informa al Administrador del Sistema.")}</p>
       </section>
     `;
   }
@@ -128,7 +154,7 @@ async function navigate(viewName, navigationTarget = null) {
 
 mainNav.addEventListener("click", async (event) => {
   const button = event.target.closest(".nav-item");
-  if (!button || button.disabled) return;
+  if (!button || button.disabled || button.classList.contains("security-hidden")) return;
   setMobileNav(false);
   await navigate(button.dataset.view);
 });
@@ -155,26 +181,20 @@ loginForm.addEventListener("submit", async (event) => {
   loginMessage.textContent = "";
 
   if (!isSupabaseConfigured) {
-    loginMessage.textContent =
-      "El Sistema no está disponible en este momento. Contacta al administrador.";
+    loginMessage.textContent = "El Sistema no está disponible en este momento. Contacta al Administrador.";
     return;
   }
 
   const email = loginForm.email.value.trim();
   const password = loginForm.password.value;
-
   const submit = loginForm.querySelector('button[type="submit"]');
   submit.disabled = true;
   submit.textContent = "Ingresando…";
 
   try {
-    const { data, error } = await supabaseClient.auth.signInWithPassword({
-      email,
-      password
-    });
-
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    await showApp(data.session);
+    await showApp(data.session, { registerLogin: true });
   } catch (error) {
     console.error(error);
     loginMessage.textContent = loginErrorMessage(error);
@@ -186,16 +206,14 @@ loginForm.addEventListener("submit", async (event) => {
 
 logoutButton.addEventListener("click", async () => {
   if (!supabaseClient) return;
-
+  await logSessionEvent("cerrar_sesion");
   await supabaseClient.auth.signOut();
   showLogin("Sesión cerrada.");
 });
 
 async function boot() {
   if (!isSupabaseConfigured) {
-    showLogin(
-      "El Sistema no está disponible en este momento. Contacta al administrador."
-    );
+    showLogin("El Sistema no está disponible en este momento. Contacta al Administrador.");
     return;
   }
 

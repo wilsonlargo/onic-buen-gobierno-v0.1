@@ -98,6 +98,16 @@
           <span class="nav-icon">%</span>
           <span>Ponderaciones</span>
         </button>
+
+        <button class="nav-item security-hidden" data-view="historial">
+          <span class="nav-icon">◷</span>
+          <span>Historial</span>
+        </button>
+
+        <button class="nav-item security-hidden" data-view="usuarios">
+          <span class="nav-icon">♙</span>
+          <span>Usuarios</span>
+        </button>
       </nav>
 
     </aside>
@@ -150,7 +160,8 @@
           </button>
 
           <div class="user-meta">
-            <span id="userEmail">Usuario</span>
+            <strong id="userDisplayName">Usuario</strong>
+            <span id="userRoleLabel">Acceso institucional</span>
           </div>
           <button id="logoutButton" class="btn btn-secondary" type="button">Salir</button>
         </div>

@@ -1,4 +1,5 @@
 import { requireSupabase } from "../supabaseClient.js";
+import { logManualEvent } from "../security.js";
 import { openModal, closeModal } from "../components/modal.js";
 
 const SUPPORTED_SCHEMA = "onic-buen-gobierno.v1";
@@ -1142,6 +1143,15 @@ export function openVigenciaImportDialog({
 
         const summary =
           data?.resumen || {};
+
+        await logManualEvent({
+          action: payload?.metadata?.tipo === "copia_seguridad" ? "restaurar_vigencia" : "importar_vigencia",
+          entityType: "Vigencia",
+          entityId: data?.vigencia_id || null,
+          entityName: data?.vigencia_nombre || payload?.vigencia?.nombre || null,
+          vigenciaId: data?.vigencia_id || null,
+          detail: { resumen: summary }
+        });
 
         if (
           typeof onImported ===

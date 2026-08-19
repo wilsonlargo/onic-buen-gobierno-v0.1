@@ -5877,3 +5877,380 @@ textarea {
   }
 
 }
+
+/* ==========================================================
+   SEGURIDAD, USUARIOS E HISTORIAL · v0.11
+   ========================================================== */
+.security-hidden {
+  display: none !important;
+}
+
+.user-meta {
+  min-width: 0;
+}
+
+.user-meta strong,
+.user-meta span {
+  display: block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-meta strong {
+  color: var(--text-strong, #173c2f);
+  font-size: 0.9rem;
+}
+
+.user-meta span {
+  color: var(--text-muted, #6c7d75);
+  font-size: 0.76rem;
+  margin-top: 2px;
+}
+
+.role-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #eef3ef;
+  border: 1px solid #d9e5dd;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #345449;
+}
+
+.role-administrador {
+  background: #e7f1eb;
+  border-color: #b9d2c2;
+  color: #154b33;
+}
+
+.role-coordinador {
+  background: #eef2e6;
+  border-color: #d4dec0;
+  color: #4b5f2f;
+}
+
+.role-consejeria {
+  background: #f5efe3;
+  border-color: #e5d4ae;
+  color: #76551f;
+}
+
+.role-consulta {
+  background: #f1f2f2;
+  border-color: #dcdfde;
+  color: #5c6561;
+}
+
+.user-summary-grid {
+  margin: 18px 0 22px;
+}
+
+.user-table-wrap td:first-child small {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted, #718079);
+}
+
+.user-assignment-section {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border, #dde6e1);
+}
+
+.user-assignment-section.is-disabled {
+  opacity: 0.55;
+}
+
+.user-assignment-group + .user-assignment-group {
+  margin-top: 16px;
+}
+
+.user-assignment-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.user-assignment-heading span {
+  color: var(--text-muted, #718079);
+  font-size: 0.78rem;
+}
+
+.user-assignment-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 8px;
+}
+
+.history-page-actions {
+  align-items: flex-end;
+}
+
+.history-filter-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.history-period-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.history-period-buttons .btn.active {
+  background: #174a35;
+  border-color: #174a35;
+  color: #fff;
+}
+
+.history-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(130px, 1fr));
+  gap: 12px;
+}
+
+.history-filter-grid label {
+  display: grid;
+  gap: 6px;
+}
+
+.history-filter-grid label > span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted, #65766e);
+}
+
+.history-filter-grid input,
+.history-filter-grid select {
+  width: 100%;
+}
+
+.history-search-field {
+  grid-column: span 2;
+}
+
+.history-filter-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.history-item {
+  display: grid;
+  grid-template-columns: minmax(165px, 0.75fr) minmax(280px, 2fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--border, #dde5e1);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.history-time {
+  display: grid;
+  gap: 4px;
+}
+
+.history-time strong {
+  font-size: 0.83rem;
+}
+
+.history-time span,
+.history-main p,
+.history-main small {
+  color: var(--text-muted, #718079);
+  font-size: 0.78rem;
+}
+
+.history-main-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.history-main p {
+  margin: 5px 0 2px;
+}
+
+.history-action-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #eef2ef;
+  border: 1px solid #dce4df;
+  color: #466056;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.history-action-chip.action-crear,
+.history-action-chip.action-aprobar_ponderacion {
+  background: #e9f3ec;
+  border-color: #c7ddcf;
+  color: #1b5a3b;
+}
+
+.history-action-chip.action-eliminar,
+.history-action-chip.action-conflicto_edicion {
+  background: #f8ece9;
+  border-color: #ebc8c0;
+  color: #8a3c2f;
+}
+
+.history-action-chip.action-actualizar,
+.history-action-chip.action-resolver_nota {
+  background: #f4f1e6;
+  border-color: #e5dbc0;
+  color: #6e5a25;
+}
+
+.history-detail-head {
+  margin-bottom: 18px;
+}
+
+.history-detail-head h3 {
+  margin: 10px 0 3px;
+}
+
+.history-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0 22px;
+}
+
+.history-meta-grid > div,
+.history-field-list > div {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f7f9f8;
+  border: 1px solid #e7ece9;
+}
+
+.history-meta-grid span,
+.history-field-list span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-muted, #718079);
+  font-size: 0.74rem;
+}
+
+.history-change-section {
+  margin-top: 20px;
+}
+
+.history-change-table td {
+  max-width: 360px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.history-field-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.history-field-list strong {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1100px) {
+  .history-filter-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .history-search-field {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 820px) {
+  .user-meta {
+    display: none;
+  }
+
+  .history-page-actions {
+    align-items: stretch;
+  }
+
+  .history-page-actions .row-actions {
+    width: 100%;
+  }
+
+  .history-page-actions .row-actions .btn {
+    flex: 1;
+  }
+
+  .history-filter-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .history-search-field {
+    grid-column: 1 / -1;
+  }
+
+  .history-filter-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .history-filter-actions .btn {
+    width: 100%;
+  }
+
+  .history-item {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .history-detail-button {
+    width: 100%;
+  }
+
+  .history-meta-grid,
+  .history-field-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .history-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .history-search-field {
+    grid-column: auto;
+  }
+
+  .history-period-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .history-period-buttons .btn {
+    width: 100%;
+  }
+
+  .user-assignment-options {
+    grid-template-columns: 1fr;
+  }
+}

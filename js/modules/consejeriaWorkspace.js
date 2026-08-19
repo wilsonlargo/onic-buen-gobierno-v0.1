@@ -1,4 +1,5 @@
 import { requireSupabase } from "../supabaseClient.js";
+import { updateWithVersion } from "../security.js";
 import { openModal, closeModal } from "../components/modal.js";
 import { setAuditContext } from "./auditoria.js";
 import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js";
@@ -282,18 +283,16 @@ function keywords(value = "") {
    DATOS
    ========================================================== */
 
-async function updateVigenciaConsejeria(id, payload) {
-  const supabase = requireSupabase();
-
-  const { data, error } = await supabase
-    .from("vigencia_consejerias")
-    .update(payload)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+async function updateVigenciaConsejeria(record, payload) {
+  return updateWithVersion({
+    table: "vigencia_consejerias",
+    record,
+    payload,
+    entityType: "Consejería en Vigencia",
+    entityName: record?.consejerias?.nombre_corto || record?.consejerias?.nombre_largo || record?.responsable || null,
+    vigenciaId: record?.vigencia_id || null,
+    vigenciaConsejeriaId: record?.id || null
+  });
 }
 
 async function getMandatosVigencia(vigenciaId) {
@@ -498,18 +497,15 @@ async function createDocument(payload) {
   return data;
 }
 
-async function updateDocument(id, payload) {
-  const supabase = requireSupabase();
-
-  const { data, error } = await supabase
-    .from("biblioteca_consejeria_documentos")
-    .update(payload)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+async function updateDocument(record, payload) {
+  return updateWithVersion({
+    table: "biblioteca_consejeria_documentos",
+    record,
+    payload,
+    entityType: "Documento de biblioteca",
+    entityName: record?.titulo || null,
+    vigenciaConsejeriaId: record?.vigencia_consejeria_id || null
+  });
 }
 
 async function deleteDocument(id) {
@@ -854,7 +850,7 @@ function openDocumentForm({
 
     try {
       if (editing) {
-        await updateDocument(record.id, payload);
+        await updateDocument(record, payload);
       } else {
         await createDocument(payload);
       }
@@ -1385,7 +1381,7 @@ export async function renderConsejeriaWorkspace(
       try {
         const updated =
           await updateVigenciaConsejeria(
-            currentRecord.id,
+            currentRecord,
             {
               responsable:
                 data.get("responsable")?.trim() || null,
@@ -1395,7 +1391,7 @@ export async function renderConsejeriaWorkspace(
                 data.get("pueblo")?.trim() || null,
               detalle:
                 data.get("detalle")?.trim() || null,
-              estado: data.get("estado")
+              estado: data.get("estado") || currentRecord.estado
             }
           );
 
@@ -2257,8 +2253,9 @@ export async function renderConsejeriaWorkspace(
         button.addEventListener(
           "click",
           async () => {
+            const record = documents.find((item) => item.id === button.dataset.id);
             await updateDocument(
-              button.dataset.id,
+              record,
               { estado: "archivado" }
             );
 
@@ -2286,8 +2283,9 @@ export async function renderConsejeriaWorkspace(
         button.addEventListener(
           "click",
           async () => {
+            const record = documents.find((item) => item.id === button.dataset.id);
             await updateDocument(
-              button.dataset.id,
+              record,
               { estado: "activo" }
             );
 

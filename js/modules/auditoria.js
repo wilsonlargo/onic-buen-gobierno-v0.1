@@ -1,5 +1,6 @@
 import { requireSupabase } from "../supabaseClient.js";
 import { openModal, closeModal } from "../components/modal.js";
+import { updateWithVersion } from "../security.js";
 
 let currentContext = null;
 let initialized = false;
@@ -147,22 +148,24 @@ async function createNote(payload) {
   return data;
 }
 
-async function updateNote(id, payload) {
+async function updateNote(note, payload) {
   const supabase = requireSupabase();
   const { data: authData } = await supabase.auth.getUser();
   const user = authData?.user;
-  const { data, error } = await supabase
-    .from("auditoria_notas")
-    .update({
+
+  return updateWithVersion({
+    table: "auditoria_notas",
+    record: note,
+    payload: {
       ...payload,
       modificado_por_id: user?.id || null,
       modificado_por_email: user?.email || "Usuario"
-    })
-    .eq("id", id)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
+    },
+    entityType: "Nota de Auditoría",
+    entityName: note?.tema || null,
+    vigenciaId: note?.vigencia_id || null,
+    vigenciaConsejeriaId: note?.vigencia_consejeria_id || null
+  });
 }
 
 function panelElements() {
@@ -552,7 +555,7 @@ function openEditNote(note) {
     submit.textContent = "Guardando…";
 
     try {
-      await updateNote(note.id, payload);
+      await updateNote(note, payload);
       closeModal();
       await refreshPanel();
     } catch (error) {

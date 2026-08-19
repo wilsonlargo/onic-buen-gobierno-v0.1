@@ -1,4 +1,5 @@
 import { requireSupabase } from "../supabaseClient.js";
+import { updateWithVersion } from "../security.js";
 import { openModal, closeModal } from "../components/modal.js";
 import { renderConsejeriaWorkspace } from "./consejeriaWorkspace.js";
 import {
@@ -206,18 +207,8 @@ async function insertConsejeria(payload) {
   return data;
 }
 
-async function updateConsejeria(id, payload) {
-  const supabase = requireSupabase();
-
-  const { data, error } = await supabase
-    .from("consejerias")
-    .update(payload)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+async function updateConsejeria(record, payload) {
+  return updateWithVersion({ table: "consejerias", record, payload, entityType: "Consejería", entityName: record?.nombre_corto || record?.nombre_largo || null });
 }
 
 async function deleteConsejeria(id) {
@@ -244,18 +235,8 @@ async function linkConsejeria(payload) {
   return data;
 }
 
-async function updateVigenciaConsejeria(id, payload) {
-  const supabase = requireSupabase();
-
-  const { data, error } = await supabase
-    .from("vigencia_consejerias")
-    .update(payload)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+async function updateVigenciaConsejeria(record, payload) {
+  return updateWithVersion({ table: "vigencia_consejerias", record, payload, entityType: "Consejería en Vigencia", entityName: record?.consejerias?.nombre_corto || record?.responsable || null, vigenciaId: record?.vigencia_id || null, vigenciaConsejeriaId: record?.id || null });
 }
 
 function openConsejeriaForm({ record = null, onSaved }) {
@@ -389,7 +370,7 @@ function openConsejeriaForm({ record = null, onSaved }) {
 
     try {
       if (editing) {
-        await updateConsejeria(record.id, payload);
+        await updateConsejeria(record, payload);
       } else {
         await insertConsejeria(payload);
       }
@@ -465,7 +446,7 @@ async function openDeleteConsejeriaDialog({ record, onDeleted, onInactivated }) 
         inactivate.textContent = "Inactivando…";
 
         try {
-          await updateConsejeria(record.id, { estado: "inactiva" });
+          await updateConsejeria(record, { estado: "inactiva" });
           closeModal();
           await onInactivated();
         } catch (error) {
@@ -801,7 +782,7 @@ function openEditLinkForm({ record, onSaved }) {
     submit.textContent = "Guardando…";
 
     try {
-      await updateVigenciaConsejeria(record.id, payload);
+      await updateVigenciaConsejeria(record, payload);
       closeModal();
       await onSaved();
     } catch (error) {
@@ -841,7 +822,7 @@ function openRetireDialog({ record, onSaved }) {
       button.textContent = "Reactivando…";
 
       try {
-        await updateVigenciaConsejeria(record.id, { estado: "activa" });
+        await updateVigenciaConsejeria(record, { estado: "activa" });
         closeModal();
         await onSaved();
       } catch (error) {
@@ -885,7 +866,7 @@ function openRetireDialog({ record, onSaved }) {
     button.textContent = "Retirando…";
 
     try {
-      await updateVigenciaConsejeria(record.id, { estado: "inactiva" });
+      await updateVigenciaConsejeria(record, { estado: "inactiva" });
       closeModal();
       await onSaved();
     } catch (error) {

@@ -1,4 +1,5 @@
 import { requireSupabase } from "../supabaseClient.js";
+import { updateWithVersion } from "../security.js";
 import { openModal, closeModal } from "../components/modal.js";
 import { renderProyectoWorkspace } from "./proyectoWorkspace.js";
 import { setAuditContext, openAuditPanel } from "./auditoria.js";
@@ -321,23 +322,21 @@ async function createProyecto(payload, mandatoIds = []) {
   return proyecto;
 }
 
-async function updateProyecto(id, payload, mandatoIds = null) {
+async function updateProyecto(record, payload, mandatoIds = null) {
   const supabase = requireSupabase();
-
-  const { data, error } = await supabase
-    .from("proyectos")
-    .update(payload)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
+  const data = await updateWithVersion({
+    table: "proyectos",
+    record,
+    payload,
+    entityType: "Proyecto",
+    entityName: record?.nombre || record?.codigo || null
+  });
 
   if (Array.isArray(mandatoIds)) {
     const { error: deleteError } = await supabase
       .from("proyecto_mandatos")
       .delete()
-      .eq("proyecto_id", id);
+      .eq("proyecto_id", record.id);
 
     if (deleteError) throw deleteError;
 
@@ -346,7 +345,7 @@ async function updateProyecto(id, payload, mandatoIds = null) {
         .from("proyecto_mandatos")
         .insert(
           mandatoIds.map((mandatoId) => ({
-            proyecto_id: id,
+            proyecto_id: record.id,
             mandato_id: mandatoId
           }))
         );
@@ -379,22 +378,6 @@ async function deleteProyecto(id) {
     .eq("id", id);
 
   if (error) throw error;
-}
-
-async function saveWeights(rows) {
-  const supabase = requireSupabase();
-
-  for (const row of rows) {
-    const { error } = await supabase
-      .from("proyectos")
-      .update({
-        ponderacion: row.ponderacion,
-        metodo_ponderacion: row.metodo_ponderacion
-      })
-      .eq("id", row.id);
-
-    if (error) throw error;
-  }
 }
 
 /* ==========================================================
@@ -433,187 +416,6 @@ function weightState(total) {
     label: `Excede ${formatPercent(Math.abs(diff))}`,
     detail: "Reduce la ponderación de uno o varios Proyectos."
   };
-}
-
-function equalWeightRows(proyectos = []) {
-  if (!proyectos.length) return [];
-
-  const sorted = [...proyectos].sort((a, b) => {
-    const orderDiff = Number(a.orden || 0) - Number(b.orden || 0);
-    if (orderDiff !== 0) return orderDiff;
-
-    return String(a.nombre || "").localeCompare(
-      String(b.nombre || ""),
-      "es"
-    );
-  });
-
-  const totalUnits = 10000;
-  const baseUnits = Math.floor(totalUnits / sorted.length);
-  const remainder = totalUnits - (baseUnits * sorted.length);
-
-  return sorted.map((proyecto, index) => ({
-    id: proyecto.id,
-    ponderacion:
-      (baseUnits + (index < remainder ? 1 : 0)) / 100,
-    metodo_ponderacion: "sugerida"
-  }));
-}
-
-function openWeightsDialog({ programa, proyectos, onSaved }) {
-  if (!proyectos.length) return;
-
-  openModal({
-    title: "Ponderación de Proyectos",
-    content: `
-      <div class="weight-dialog-intro">
-        <div>
-          <span class="context-label">Programa</span>
-          <strong>${escapeHTML(programa.nombre)}</strong>
-        </div>
-
-        <p class="muted">
-          Los Proyectos son el único nivel con ponderación modificable.
-          La suma del Programa debe ser exactamente <strong>100,00 %</strong>.
-        </p>
-      </div>
-
-      <div class="weight-dialog-actions">
-        <button id="equalizeProjectWeights" class="btn btn-secondary" type="button">
-          ${scaleIcon()}
-          Distribuir equitativamente
-        </button>
-      </div>
-
-      <form id="projectWeightsForm">
-        <div class="weight-editor-list">
-          ${proyectos.map((proyecto) => `
-            <div class="weight-editor-row">
-              <div>
-                <strong>${escapeHTML(proyecto.codigo || proyecto.nombre)}</strong>
-                <small>${escapeHTML(proyecto.nombre)}</small>
-              </div>
-
-              <label>
-                <span>Ponderación</span>
-                <div class="percent-input">
-                  <input
-                    class="weight-input"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value="${Number(proyecto.ponderacion || 0).toFixed(2)}"
-                    data-id="${proyecto.id}"
-                  >
-                  <span>%</span>
-                </div>
-              </label>
-            </div>
-          `).join("")}
-        </div>
-
-        <div id="weightDialogTotal" class="weight-dialog-total"></div>
-
-        <p id="weightsMessage" class="form-message"></p>
-
-        <div class="form-actions">
-          <button id="cancelProjectWeights" class="btn btn-secondary" type="button">
-            Cancelar
-          </button>
-
-          <button id="saveProjectWeights" class="btn btn-primary" type="submit">
-            Guardar ponderaciones
-          </button>
-        </div>
-      </form>
-    `
-  });
-
-  const form = document.querySelector("#projectWeightsForm");
-  const inputs = [...form.querySelectorAll(".weight-input")];
-  const totalBox = document.querySelector("#weightDialogTotal");
-  const message = document.querySelector("#weightsMessage");
-  const equalButton = document.querySelector("#equalizeProjectWeights");
-
-  function currentTotal() {
-    return inputs.reduce(
-      (sum, input) => sum + Number(input.value || 0),
-      0
-    );
-  }
-
-  function renderTotal() {
-    const total = currentTotal();
-    const state = weightState(total);
-
-    totalBox.className = `weight-dialog-total ${state.type}`;
-    totalBox.innerHTML = `
-      <span>Total</span>
-      <strong>${formatPercent(total)}</strong>
-      <small>${escapeHTML(state.detail)}</small>
-    `;
-  }
-
-  inputs.forEach((input) =>
-    input.addEventListener("input", renderTotal)
-  );
-
-  document
-    .querySelector("#cancelProjectWeights")
-    .addEventListener("click", closeModal);
-
-  equalButton.addEventListener("click", () => {
-    const rows = equalWeightRows(proyectos);
-    const byId = new Map(rows.map((row) => [row.id, row]));
-
-    inputs.forEach((input) => {
-      const row = byId.get(input.dataset.id);
-
-      if (row) {
-        input.value = row.ponderacion.toFixed(2);
-      }
-    });
-
-    renderTotal();
-  });
-
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    message.textContent = "";
-
-    const total = currentTotal();
-
-    if (Math.abs(total - 100) > 0.005) {
-      message.textContent =
-        `La suma debe ser exactamente 100,00 %. Actualmente es ${formatPercent(total)}.`;
-      return;
-    }
-
-    const rows = inputs.map((input) => ({
-      id: input.dataset.id,
-      ponderacion: Number(input.value || 0),
-      metodo_ponderacion: "manual"
-    }));
-
-    const save = document.querySelector("#saveProjectWeights");
-    save.disabled = true;
-    save.textContent = "Guardando…";
-
-    try {
-      await saveWeights(rows);
-      closeModal();
-      await onSaved();
-    } catch (error) {
-      console.error(error);
-      message.textContent =
-        error.message || "No fue posible guardar las ponderaciones.";
-      save.disabled = false;
-      save.textContent = "Guardar ponderaciones";
-    }
-  });
-
-  renderTotal();
 }
 
 /* ==========================================================
@@ -894,14 +696,6 @@ function openProyectoForm({
 
     const formData = new FormData(form);
 
-    const ponderacion = Number(formData.get("ponderacion") || 0);
-
-    if (ponderacion < 0 || ponderacion > 100) {
-      message.textContent =
-        "La ponderación debe estar entre 0 y 100 %.";
-      return;
-    }
-
     const payload = {
       codigo: formData.get("codigo")?.trim() || null,
       nombre: formData.get("nombre")?.trim(),
@@ -919,8 +713,6 @@ function openProyectoForm({
         financed.checked && formData.get("valor_estimado") !== ""
           ? Number(formData.get("valor_estimado"))
           : null,
-      metodo_ponderacion: "manual",
-      ponderacion,
       orden: Number(formData.get("orden") || 0)
     };
 
@@ -941,6 +733,8 @@ function openProyectoForm({
 
     if (!editing) {
       payload.programa_id = programa.id;
+      payload.metodo_ponderacion = "manual";
+      payload.ponderacion = 0;
     }
 
     const selectedMandates = [
@@ -954,7 +748,7 @@ function openProyectoForm({
     try {
       if (editing) {
         await updateProyecto(
-          record.id,
+          record,
           payload,
           selectedMandates
         );
@@ -1083,7 +877,7 @@ async function openDeleteProyectoDialog({ record, onChanged }) {
 
         try {
           await updateProyecto(
-            record.id,
+            record,
             { estado: "cerrado" },
             null
           );

@@ -1,4 +1,5 @@
 import { requireSupabase } from "../supabaseClient.js";
+import { updateWithVersion } from "../security.js";
 import { openModal, closeModal } from "../components/modal.js";
 import { setAuditContext, openAuditPanel } from "./auditoria.js";
 import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js";
@@ -216,16 +217,21 @@ async function getMandatosConsejeria(vigenciaConsejeriaId) {
   return mandatos || [];
 }
 
-async function updateProject(projectId, payload, mandateIds = null) {
+async function updateProject(record, payload, mandateIds = null) {
   const supabase = requireSupabase();
-  const { data, error } = await supabase.from("proyectos").update(payload).eq("id", projectId).select().single();
-  if (error) throw error;
+  const data = await updateWithVersion({
+    table: "proyectos",
+    record,
+    payload,
+    entityType: "Proyecto",
+    entityName: record?.nombre || record?.codigo || null
+  });
   if (Array.isArray(mandateIds)) {
-    const { error: deleteError } = await supabase.from("proyecto_mandatos").delete().eq("proyecto_id", projectId);
+    const { error: deleteError } = await supabase.from("proyecto_mandatos").delete().eq("proyecto_id", record.id);
     if (deleteError) throw deleteError;
     if (mandateIds.length) {
       const { error: insertError } = await supabase.from("proyecto_mandatos").insert(
-        mandateIds.map((mandatoId) => ({ proyecto_id: projectId, mandato_id: mandatoId }))
+        mandateIds.map((mandatoId) => ({ proyecto_id: record.id, mandato_id: mandatoId }))
       );
       if (insertError) throw insertError;
     }
@@ -286,11 +292,8 @@ async function createActivity(payload) {
   return data;
 }
 
-async function updateActivity(id, payload) {
-  const supabase = requireSupabase();
-  const { data, error } = await supabase.from("actividades").update(payload).eq("id", id).select().single();
-  if (error) throw error;
-  return data;
+async function updateActivity(record, payload) {
+  return updateWithVersion({ table: "actividades", record, payload, entityType: "Actividad", entityName: record?.nombre || record?.codigo || null });
 }
 
 async function deleteActivity(id) {
@@ -306,11 +309,8 @@ async function createIndicator(payload) {
   return data;
 }
 
-async function updateIndicator(id, payload) {
-  const supabase = requireSupabase();
-  const { data, error } = await supabase.from("indicadores_actividad").update(payload).eq("id", id).select().single();
-  if (error) throw error;
-  return data;
+async function updateIndicator(record, payload) {
+  return updateWithVersion({ table: "indicadores_actividad", record, payload, entityType: "Indicador", entityName: record?.nombre || record?.codigo || null });
 }
 
 async function deleteIndicator(id) {
@@ -332,11 +332,8 @@ async function createBudgetItem(payload) {
   return data;
 }
 
-async function updateBudgetItem(id, payload) {
-  const supabase = requireSupabase();
-  const { data, error } = await supabase.from("presupuesto_actividad_rubros").update(payload).eq("id", id).select().single();
-  if (error) throw error;
-  return data;
+async function updateBudgetItem(record, payload) {
+  return updateWithVersion({ table: "presupuesto_actividad_rubros", record, payload, entityType: "Rubro presupuestal", entityName: record?.rubro || null });
 }
 
 async function deleteBudgetItem(id) {
@@ -352,11 +349,8 @@ async function createEvidence(payload) {
   return data;
 }
 
-async function updateEvidence(id, payload) {
-  const supabase = requireSupabase();
-  const { data, error } = await supabase.from("evidencias_actividad").update(payload).eq("id", id).select().single();
-  if (error) throw error;
-  return data;
+async function updateEvidence(record, payload) {
+  return updateWithVersion({ table: "evidencias_actividad", record, payload, entityType: "Evidencia", entityName: record?.nombre || null });
 }
 
 async function createActivityFollowup(payload) {
@@ -443,7 +437,7 @@ function openActivityForm({ projectId, record = null, onSaved }) {
     submit.disabled = true;
     submit.textContent = "Guardando…";
     try {
-      if (editing) await updateActivity(record.id, payload); else await createActivity(payload);
+      if (editing) await updateActivity(record, payload); else await createActivity(payload);
       closeModal();
       await onSaved();
     } catch (error) {
@@ -505,7 +499,7 @@ function openIndicatorForm({ activityId, record = null, onSaved }) {
     submit.disabled = true;
     submit.textContent = "Guardando…";
     try {
-      if (editing) await updateIndicator(record.id, payload); else await createIndicator(payload);
+      if (editing) await updateIndicator(record, payload); else await createIndicator(payload);
       closeModal();
       await onSaved();
     } catch (error) {
@@ -601,7 +595,7 @@ function openBudgetForm({ activityId, record = null, onSaved }) {
     submit.disabled = true;
     submit.textContent = "Guardando…";
     try {
-      if (editing) await updateBudgetItem(record.id, payload); else await createBudgetItem(payload);
+      if (editing) await updateBudgetItem(record, payload); else await createBudgetItem(payload);
       closeModal();
       await onSaved();
     } catch (error) {
@@ -653,7 +647,7 @@ function openEvidenceForm({ activityId, indicators, record = null, onSaved }) {
     submit.disabled = true;
     submit.textContent = "Guardando…";
     try {
-      if (editing) await updateEvidence(record.id, payload); else await createEvidence(payload);
+      if (editing) await updateEvidence(record, payload); else await createEvidence(payload);
       closeModal();
       await onSaved();
     } catch (error) {
@@ -912,8 +906,6 @@ export async function renderProyectoWorkspace(container, options) {
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const data = new FormData(form);
-      const weight = Number(data.get("ponderacion") || 0);
-      if (!Number.isFinite(weight) || weight < 0 || weight > 100) { message.textContent = "La ponderación debe estar entre 0 y 100 %."; return; }
       const start = data.get("fecha_inicio") || null;
       const end = data.get("fecha_fin") || null;
       if (start && end && end < start) { message.textContent = "La fecha final no puede ser anterior a la fecha inicial."; return; }
@@ -922,7 +914,7 @@ export async function renderProyectoWorkspace(container, options) {
       submit.disabled = true;
       submit.textContent = "Guardando…";
       try {
-        project = await updateProject(project.id, {
+        project = await updateProject(project, {
           codigo: data.get("codigo")?.trim() || null,
           nombre: data.get("nombre")?.trim(),
           nombre_corto: data.get("nombre_corto")?.trim() || null,
@@ -932,8 +924,6 @@ export async function renderProyectoWorkspace(container, options) {
           fecha_inicio: start,
           fecha_fin: end,
           estado: data.get("estado"),
-          ponderacion: weight,
-          metodo_ponderacion: "manual",
           orden: Number(data.get("orden") || 0),
           tiene_financiacion: financed.checked,
           valor_estimado: financed.checked && data.get("valor_estimado") !== "" ? Number(data.get("valor_estimado")) : null
@@ -980,7 +970,7 @@ export async function renderProyectoWorkspace(container, options) {
           cancelButton.disabled = true;
           cancelButton.textContent = "Actualizando…";
           try {
-            await updateActivity(activity.id, { estado: "cancelada" });
+            await updateActivity(activity, { estado: "cancelada" });
             closeModal();
             await reloadOperationalData();
             renderActivities();
@@ -1294,7 +1284,7 @@ export async function renderProyectoWorkspace(container, options) {
       if (start && end && end < start) { message.textContent = "La fecha final no puede ser anterior a la fecha inicial."; return; }
       const submit = form.querySelector('button[type="submit"]'); submit.disabled = true; submit.textContent = "Guardando…";
       try {
-        await updateActivity(activity.id, { codigo: data.get("codigo")?.trim() || null, nombre: data.get("nombre")?.trim(), descripcion: data.get("descripcion")?.trim() || null, responsable: data.get("responsable")?.trim() || null, fecha_inicio: start, fecha_fin: end, estado: data.get("estado"), orden: Number(data.get("orden") || 0) });
+        await updateActivity(activity, { codigo: data.get("codigo")?.trim() || null, nombre: data.get("nombre")?.trim(), descripcion: data.get("descripcion")?.trim() || null, responsable: data.get("responsable")?.trim() || null, fecha_inicio: start, fecha_fin: end, estado: data.get("estado"), orden: Number(data.get("orden") || 0) });
         await refreshCurrentActivityData();
         renderActivityWorkspace();
         showToast("Actividad actualizada.");
@@ -1329,7 +1319,7 @@ export async function renderProyectoWorkspace(container, options) {
         inactivate.addEventListener("click", async () => {
           inactivate.disabled = true;
           try {
-            await updateIndicator(indicator.id, { estado: "inactivo" });
+            await updateIndicator(indicator, { estado: "inactivo" });
             closeModal();
             await refreshCurrentActivityData();
             renderActivityWorkspace();
@@ -1466,7 +1456,7 @@ export async function renderProyectoWorkspace(container, options) {
         openModal({ title: "Rubro con ejecución", content: `<div class="danger-callout"><strong>${escapeHTML(record.rubro)}</strong><p>Este rubro ya registra ejecución presupuestal y no debe eliminarse.</p></div><p class="muted">Puedes marcarlo como inactivo para conservar el historial financiero.</p><div class="form-actions"><button id="closeBudgetProtection" class="btn btn-secondary" type="button">Cerrar</button>${record.estado !== "inactivo" ? `<button id="inactivateBudgetRecord" class="btn btn-danger" type="button">Inactivar rubro</button>` : ""}</div>` });
         document.querySelector("#closeBudgetProtection").addEventListener("click", closeModal);
         const inactivate = document.querySelector("#inactivateBudgetRecord");
-        if (inactivate) inactivate.addEventListener("click", async () => { await updateBudgetItem(record.id, { estado: "inactivo" }); closeModal(); await refreshCurrentActivityData(); renderActivityWorkspace(); activityTab = "presupuesto"; renderActivityTab(); showToast("Rubro inactivado."); });
+        if (inactivate) inactivate.addEventListener("click", async () => { await updateBudgetItem(record, { estado: "inactivo" }); closeModal(); await refreshCurrentActivityData(); renderActivityWorkspace(); activityTab = "presupuesto"; renderActivityTab(); showToast("Rubro inactivado."); });
         return;
       }
       try {
@@ -1504,8 +1494,8 @@ export async function renderProyectoWorkspace(container, options) {
       const record = rows.find((item) => item.id === button.dataset.id);
       openEvidenceForm({ activityId: activity.id, indicators: activityIndicators, record, onSaved: async () => { await refreshCurrentActivityData(); renderActivityWorkspace(); activityTab = "evidencias"; renderActivityTab(); showToast("Evidencia actualizada."); } });
     }));
-    body.querySelectorAll(".archive-evidence").forEach((button) => button.addEventListener("click", async () => { await updateEvidence(button.dataset.id, { estado: "archivada" }); await refreshCurrentActivityData(); renderActivityWorkspace(); activityTab = "evidencias"; renderActivityTab(); showToast("Evidencia archivada."); }));
-    body.querySelectorAll(".restore-evidence").forEach((button) => button.addEventListener("click", async () => { await updateEvidence(button.dataset.id, { estado: "activa" }); await refreshCurrentActivityData(); renderActivityWorkspace(); activityTab = "evidencias"; renderActivityTab(); showToast("Evidencia reactivada."); }));
+    body.querySelectorAll(".archive-evidence").forEach((button) => button.addEventListener("click", async () => { const record = rows.find((item) => item.id === button.dataset.id); await updateEvidence(record, { estado: "archivada" }); await refreshCurrentActivityData(); renderActivityWorkspace(); activityTab = "evidencias"; renderActivityTab(); showToast("Evidencia archivada."); }));
+    body.querySelectorAll(".restore-evidence").forEach((button) => button.addEventListener("click", async () => { const record = rows.find((item) => item.id === button.dataset.id); await updateEvidence(record, { estado: "activa" }); await refreshCurrentActivityData(); renderActivityWorkspace(); activityTab = "evidencias"; renderActivityTab(); showToast("Evidencia reactivada."); }));
   }
 
   async function renderActivityTracking() {

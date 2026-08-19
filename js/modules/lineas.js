@@ -1,4 +1,5 @@
 import { requireSupabase } from "../supabaseClient.js";
+import { updateWithVersion } from "../security.js";
 import { openModal, closeModal } from "../components/modal.js";
 import { setAuditContext, openAuditPanel } from "./auditoria.js";
 
@@ -158,18 +159,15 @@ async function createLinea(payload) {
   return data;
 }
 
-async function updateLinea(id, payload) {
-  const supabase = requireSupabase();
-
-  const { data, error } = await supabase
-    .from("lineas_accion")
-    .update(payload)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+async function updateLinea(record, payload) {
+  return updateWithVersion({
+    table: "lineas_accion",
+    record,
+    payload,
+    entityType: "Línea de Acción",
+    entityName: record?.nombre || record?.nombre_corto || null,
+    vigenciaConsejeriaId: record?.vigencia_consejeria_id || null
+  });
 }
 
 
@@ -354,7 +352,7 @@ function openLineaForm({
 
     try {
       if (editing) {
-        await updateLinea(record.id, payload);
+        await updateLinea(record, payload);
       } else {
         await createLinea(payload);
       }
@@ -456,7 +454,7 @@ async function openDeleteLineaDialog({ record, onChanged }) {
       button.textContent = `${label}…`;
 
       try {
-        await updateLinea(record.id, { estado });
+        await updateLinea(record, { estado });
         closeModal();
         await onChanged();
       } catch (error) {

@@ -1,4 +1,5 @@
 import { requireSupabase } from "../supabaseClient.js";
+import { updateWithVersion } from "../security.js";
 import { openModal, closeModal } from "../components/modal.js";
 
 function escapeHTML(value = "") {
@@ -158,22 +159,22 @@ async function createMandato(payload, consejeriaLinkIds = []) {
   return mandato;
 }
 
-async function updateMandato(id, payload, consejeriaLinkIds = []) {
+async function updateMandato(record, payload, consejeriaLinkIds = []) {
   const supabase = requireSupabase();
 
-  const { data, error } = await supabase
-    .from("mandatos")
-    .update(payload)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
+  const data = await updateWithVersion({
+    table: "mandatos",
+    record,
+    payload,
+    entityType: "Mandato",
+    entityName: record?.codigo || record?.titulo || null,
+    vigenciaId: record?.vigencia_id || null
+  });
 
   const { error: deleteLinksError } = await supabase
     .from("mandato_consejerias")
     .delete()
-    .eq("mandato_id", id);
+    .eq("mandato_id", record.id);
 
   if (deleteLinksError) throw deleteLinksError;
 
@@ -182,7 +183,7 @@ async function updateMandato(id, payload, consejeriaLinkIds = []) {
       .from("mandato_consejerias")
       .insert(
         consejeriaLinkIds.map((vigenciaConsejeriaId) => ({
-          mandato_id: id,
+          mandato_id: record.id,
           vigencia_consejeria_id: vigenciaConsejeriaId
         }))
       );
@@ -428,14 +429,9 @@ async function openDeleteMandatoDialog({ record, onDeleted }) {
         archive.textContent = "Archivando…";
 
         try {
-          const supabase = requireSupabase();
-
-          const { error } = await supabase
-            .from("mandatos")
-            .update({ estado: "archivado" })
-            .eq("id", record.id);
-
-          if (error) throw error;
+          await updateMandato(record, { estado: "archivado" },
+            (record.mandato_consejerias || []).map((item) => item.vigencia_consejeria_id).filter(Boolean)
+          );
 
           closeModal();
           await onDeleted();
@@ -826,7 +822,7 @@ function openMandatoForm({ vigencia, fuentes, consejerias, record = null, onSave
     try {
       if (editing) {
         delete payload.vigencia_id;
-        await updateMandato(record.id, payload, selected);
+        await updateMandato(record, payload, selected);
       } else {
         await createMandato(payload, selected);
       }

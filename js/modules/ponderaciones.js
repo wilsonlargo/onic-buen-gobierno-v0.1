@@ -1,4 +1,5 @@
 import { requireSupabase } from "../supabaseClient.js";
+import { canApproveWeights } from "../security.js";
 import { openModal, closeModal } from "../components/modal.js";
 import { setAuditContext, openAuditPanel } from "./auditoria.js";
 
@@ -170,7 +171,7 @@ async function getHierarchy(vigenciaConsejeriaId) {
   if (programIds.length) {
     const { data, error } = await supabase
       .from("proyectos")
-      .select("id,programa_id,codigo,nombre,nombre_corto,descripcion,estado,ponderacion,metodo_ponderacion,orden")
+      .select("id,programa_id,codigo,nombre,nombre_corto,descripcion,estado,ponderacion,metodo_ponderacion,orden,row_version")
       .in("programa_id", programIds)
       .order("orden", { ascending: true })
       .order("nombre", { ascending: true });
@@ -500,7 +501,7 @@ export async function renderPonderaciones(container, navigationTarget = null) {
 
   function canApprove() {
     const review = reviewState();
-    return review.total > 0 && review.errors === 0 && approvalDescription.trim().length > 0;
+    return canApproveWeights() && review.total > 0 && review.errors === 0 && approvalDescription.trim().length > 0;
   }
 
   function updateTopActions() {
@@ -891,7 +892,8 @@ export async function renderPonderaciones(container, navigationTarget = null) {
       .map((project) => ({
         proyecto_id: project.id,
         ponderacion: Math.round(Number(currentDraft.get(project.id) || 0) * 100) / 100,
-        metodo_ponderacion: currentMethods.get(project.id) === "sugerida" ? "sugerida" : "manual"
+        metodo_ponderacion: currentMethods.get(project.id) === "sugerida" ? "sugerida" : "manual",
+        version_base: Number(project.row_version || 1)
       }));
   }
 

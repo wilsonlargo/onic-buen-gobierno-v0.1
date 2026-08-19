@@ -1,4 +1,5 @@
 import { requireSupabase } from "../supabaseClient.js";
+import { updateWithVersion } from "../security.js";
 import { openModal, closeModal } from "../components/modal.js";
 
 function escapeHTML(value = "") {
@@ -170,18 +171,14 @@ async function createPrograma(payload) {
   return data;
 }
 
-async function updatePrograma(id, payload) {
-  const supabase = requireSupabase();
-
-  const { data, error } = await supabase
-    .from("programas")
-    .update(payload)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+async function updatePrograma(record, payload) {
+  return updateWithVersion({
+    table: "programas",
+    record,
+    payload,
+    entityType: "Programa",
+    entityName: record?.nombre || record?.nombre_corto || null
+  });
 }
 
 async function getProyectoCount(programaId) {
@@ -399,7 +396,7 @@ function openProgramaForm({
 
     try {
       if (editing) {
-        await updatePrograma(record.id, payload);
+        await updatePrograma(record, payload);
       } else {
         await createPrograma(payload);
       }
@@ -502,7 +499,7 @@ async function openDeleteProgramaDialog({ record, onChanged }) {
       button.textContent = `${label}…`;
 
       try {
-        await updatePrograma(record.id, { estado });
+        await updatePrograma(record, { estado });
         closeModal();
         await onChanged();
       } catch (error) {

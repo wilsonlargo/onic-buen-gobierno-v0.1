@@ -1,4 +1,5 @@
 import { requireSupabase } from "../supabaseClient.js";
+import { logManualEvent } from "../security.js";
 import { openModal, closeModal } from "../components/modal.js";
 
 const LOGO_PATH = "./assets/branding/onic-logo.png";
@@ -4125,6 +4126,18 @@ export async function openDocumentReportDialog({
   const counts =
     summary.counts;
 
+  async function logGeneratedDocument(format) {
+    await logManualEvent({
+      action: "generar_documento",
+      entityType: scope === "vigencia" ? "Vigencia" : scope === "consejeria" ? "Consejería" : "Proyecto",
+      entityId: scope === "vigencia" ? vigenciaId : scope === "consejeria" ? (context.consejeriaRef || null) : (context.projectId || null),
+      entityName: summary.title || null,
+      vigenciaId,
+      vigenciaConsejeriaId: context.consejeriaRef || null,
+      detail: { formato: format, alcance: scope }
+    });
+  }
+
   openModal({
     title:
       "Generar documento",
@@ -4321,6 +4334,8 @@ export async function openDocumentReportDialog({
           await logo()
         );
 
+        await logGeneratedDocument("PDF");
+
         message.textContent =
           "PDF generado correctamente.";
       } catch (error) {
@@ -4359,6 +4374,8 @@ export async function openDocumentReportDialog({
           model,
           await logo()
         );
+
+        await logGeneratedDocument("Word");
 
         message.textContent =
           "Documento Word generado correctamente.";
