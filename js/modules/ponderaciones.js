@@ -323,7 +323,7 @@ function approvalHelpHTML() {
       <div class="ponderacion-draft-note">
         <strong>Importante:</strong>
         cualquier cambio realizado en esta pantalla es una propuesta temporal.
-        La base de datos solo se actualiza al seleccionar <strong>Aprobar ponderación</strong>.
+        Los cambios solo quedan registrados al seleccionar <strong>Aprobar ponderación</strong>.
       </div>
     </section>
   `;
@@ -1006,8 +1006,8 @@ export async function renderPonderaciones(container, navigationTarget = null) {
       if (String(error.message || "").toLowerCase().includes("ponderacion_consejeria_aprobaciones")) {
         content.innerHTML = `
           <div class="danger-callout">
-            <strong>Falta habilitar el módulo de Ponderaciones en la base de datos.</strong>
-            <p>Ejecuta la migración <code>014_ponderaciones_consejeria.sql</code> en Supabase y vuelve a cargar la página.</p>
+            <strong>El módulo de Ponderaciones no está disponible en este momento.</strong>
+            <p>Informa al administrador del Sistema para habilitar esta función.</p>
           </div>
         `;
         return;
@@ -1069,7 +1069,7 @@ export async function renderPonderaciones(container, navigationTarget = null) {
     content.innerHTML = `
       <div class="empty-state">
         <strong>No fue posible cargar el módulo Ponderaciones.</strong>
-        <p>${escapeHTML(error.message || "Revisa la conexión con Supabase.")}</p>
+        <p>${escapeHTML(error.message || "No fue posible cargar las Ponderaciones. Intenta nuevamente.")}</p>
       </div>
     `;
   }

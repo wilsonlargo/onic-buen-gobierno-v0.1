@@ -2459,7 +2459,7 @@ async function fetchLogoAssets() {
 }
 
 /* ==========================================================
-   PDF directo con pdfmake
+   Generación de PDF
    ========================================================== */
 
 function pdfCell(value) {
@@ -3071,7 +3071,7 @@ async function downloadPdf(
 }
 
 /* ==========================================================
-   Word directo con docx.js
+   Generación de Word
    ========================================================== */
 
 function requireDocx() {
@@ -4244,7 +4244,7 @@ export async function openDocumentReportDialog({
           </strong>
 
           <small>
-            Documento .docx editable para
+            Documento Word editable para
             ajustes posteriores.
           </small>
         </button>

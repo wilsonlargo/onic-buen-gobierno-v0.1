@@ -387,8 +387,8 @@ export async function renderVigencias(container) {
       console.error(error);
       content.innerHTML = `
         <div class="empty-state">
-          <strong>No se pudo consultar Supabase.</strong>
-          <p>${escapeHTML(error.message || "Revisa la configuración y las políticas RLS.")}</p>
+          <strong>No fue posible cargar las Vigencias.</strong>
+          <p>No fue posible cargar las Vigencias. Intenta nuevamente o informa al administrador del Sistema.</p>
         </div>
       `;
     }

@@ -2417,7 +2417,7 @@ export async function renderConsejeriaWorkspace(
         <p class="muted">
           ${escapeHTML(
             error.message ||
-            "Revisa la conexión con Supabase y confirma que ejecutaste la migración 009."
+            "No fue posible abrir la información de la Consejería. Intenta nuevamente o informa al administrador del Sistema."
           )}
         </p>
 

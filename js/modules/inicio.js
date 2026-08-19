@@ -1155,7 +1155,7 @@ export async function renderInicio(container, navigationTarget = null) {
           <p>
             ${escapeHTML(
               error.message ||
-              "Revisa la conexión con Supabase."
+              "No fue posible actualizar la información. Intenta nuevamente."
             )}
           </p>
         </div>
@@ -1255,7 +1255,7 @@ export async function renderInicio(container, navigationTarget = null) {
         <p>
           ${escapeHTML(
             error.message ||
-            "Revisa la conexión con Supabase."
+            "No fue posible actualizar la información. Intenta nuevamente."
           )}
         </p>
       </div>

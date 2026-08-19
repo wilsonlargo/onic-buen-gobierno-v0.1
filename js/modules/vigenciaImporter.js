@@ -48,7 +48,7 @@ function validatePayload(payload) {
   ) {
     return {
       errors: [
-        "El archivo debe contener un objeto JSON."
+        "El archivo seleccionado no tiene una estructura válida."
       ],
       warnings
     };
@@ -56,7 +56,7 @@ function validatePayload(payload) {
 
   if (payload.schema !== SUPPORTED_SCHEMA) {
     errors.push(
-      `El campo schema debe ser "${SUPPORTED_SCHEMA}".`
+      "El archivo no corresponde a una copia compatible con esta versión del Sistema."
     );
   }
 
@@ -674,8 +674,8 @@ export function openVigenciaImportDialog({
         </p>
 
         <p>
-          La operación es <strong>atómica</strong>:
-          si algo falla, no se guarda ninguna parte
+          La importación es <strong>segura</strong>:
+          si ocurre un error, no se guardará información incompleta
           de la Vigencia.
         </p>
       </div>
@@ -1105,8 +1105,7 @@ export function openVigenciaImportDialog({
 
           <p>
             ${escapeHTML(
-              error.message ||
-              "JSON no válido."
+              "El archivo seleccionado no es válido o está dañado."
             )}
           </p>
         </div>
@@ -1170,8 +1169,8 @@ export function openVigenciaImportDialog({
                 </strong>
 
                 <p>
-                  La Vigencia completa fue creada en
-                  Supabase.
+                  La Vigencia completa fue creada correctamente
+                  en el Sistema.
                 </p>
               </div>
             </div>

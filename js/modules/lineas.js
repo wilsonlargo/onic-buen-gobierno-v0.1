@@ -1665,7 +1665,7 @@ export async function renderLineas(container, navigationTarget = null) {
     content.innerHTML = `
       <div class="empty-state">
         <strong>No fue posible cargar Líneas de Acción.</strong>
-        <p>${escapeHTML(error.message || "Revisa la conexión con Supabase.")}</p>
+        <p>${escapeHTML(error.message || "No fue posible cargar las Líneas de Acción. Intenta nuevamente.")}</p>
       </div>
     `;
   }

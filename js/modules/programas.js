@@ -1898,7 +1898,7 @@ export async function renderProgramas(container) {
         <p>
           ${escapeHTML(
             error.message ||
-            "Revisa la conexión con Supabase."
+            "No fue posible cargar los Programas. Intenta nuevamente."
           )}
         </p>
       </div>

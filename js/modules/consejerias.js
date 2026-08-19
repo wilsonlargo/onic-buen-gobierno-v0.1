@@ -863,7 +863,7 @@ function openRetireDialog({ record, onSaved }) {
       </p>
 
       <p class="muted">
-        La vinculación no se eliminará de la base de datos. Quedará marcada como
+        La vinculación no se eliminará definitivamente. Quedará marcada como
         <strong>inactiva</strong> para conservar el historial y evitar la pérdida
         de Líneas de Acción, Programas o Proyectos relacionados.
       </p>
@@ -1388,7 +1388,7 @@ export async function renderConsejerias(container, navigationTarget = null) {
       <section class="panel" style="margin-top: 0">
         <p class="eyebrow">Error</p>
         <h2>No fue posible cargar Consejerías</h2>
-        <p class="muted">${escapeHTML(error.message || "Revisa la conexión con Supabase.")}</p>
+        <p class="muted">${escapeHTML(error.message || "No fue posible cargar las Consejerías. Intenta nuevamente.")}</p>
       </section>
     `;
   }

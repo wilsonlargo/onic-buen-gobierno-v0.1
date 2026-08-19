@@ -18,6 +18,9 @@ const userEmail = document.querySelector("#userEmail");
 const pageTitle = document.querySelector("#pageTitle");
 const mainContent = document.querySelector("#mainContent");
 const mainNav = document.querySelector("#mainNav");
+const sidebar = document.querySelector(".sidebar");
+const mobileMenuButton = document.querySelector("#mobileMenuButton");
+const mobileNavScrim = document.querySelector("#mobileNavScrim");
 
 const views = {
   inicio: {
@@ -53,6 +56,28 @@ const views = {
     render: renderPonderaciones
   }
 };
+
+function isMobileLayout() {
+  return window.matchMedia("(max-width: 820px)").matches;
+}
+
+function setMobileNav(open) {
+  if (!sidebar || !mobileMenuButton || !mobileNavScrim) return;
+  const shouldOpen = Boolean(open) && isMobileLayout();
+  sidebar.classList.toggle("mobile-open", shouldOpen);
+  mobileNavScrim.classList.toggle("visible", shouldOpen);
+  mobileNavScrim.setAttribute("aria-hidden", String(!shouldOpen));
+  mobileMenuButton.setAttribute("aria-expanded", String(shouldOpen));
+  mobileMenuButton.setAttribute("aria-label", shouldOpen ? "Cerrar menú principal" : "Abrir menú principal");
+  document.body.classList.toggle("mobile-nav-open", shouldOpen);
+}
+
+function loginErrorMessage(error) {
+  const raw = String(error?.message || "").toLowerCase();
+  if (raw.includes("invalid login credentials")) return "Correo o contraseña incorrectos.";
+  if (raw.includes("email not confirmed")) return "El correo electrónico aún no ha sido confirmado.";
+  return "No fue posible iniciar sesión. Intenta nuevamente.";
+}
 
 function showLogin(message = "") {
   loginView.classList.remove("hidden");
@@ -95,7 +120,7 @@ async function navigate(viewName, navigationTarget = null) {
       <section class="panel" style="margin-top: 0">
         <p class="eyebrow">Error</p>
         <h2>No fue posible cargar el módulo</h2>
-        <p class="muted">${error.message || "Error inesperado"}</p>
+        <p class="muted">Intenta nuevamente. Si el problema continúa, informa al administrador del Sistema.</p>
       </section>
     `;
   }
@@ -104,7 +129,25 @@ async function navigate(viewName, navigationTarget = null) {
 mainNav.addEventListener("click", async (event) => {
   const button = event.target.closest(".nav-item");
   if (!button || button.disabled) return;
+  setMobileNav(false);
   await navigate(button.dataset.view);
+});
+
+mobileMenuButton?.addEventListener("click", () => {
+  setMobileNav(!sidebar?.classList.contains("mobile-open"));
+});
+
+mobileNavScrim?.addEventListener("click", () => setMobileNav(false));
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && sidebar?.classList.contains("mobile-open")) {
+    setMobileNav(false);
+    mobileMenuButton?.focus();
+  }
+});
+
+window.addEventListener("resize", () => {
+  if (!isMobileLayout()) setMobileNav(false);
 });
 
 loginForm.addEventListener("submit", async (event) => {
@@ -113,7 +156,7 @@ loginForm.addEventListener("submit", async (event) => {
 
   if (!isSupabaseConfigured) {
     loginMessage.textContent =
-      "Primero configura la URL y la clave pública de Supabase en js/config.js.";
+      "El Sistema no está disponible en este momento. Contacta al administrador.";
     return;
   }
 
@@ -134,8 +177,7 @@ loginForm.addEventListener("submit", async (event) => {
     await showApp(data.session);
   } catch (error) {
     console.error(error);
-    loginMessage.textContent =
-      error.message || "No fue posible iniciar sesión.";
+    loginMessage.textContent = loginErrorMessage(error);
   } finally {
     submit.disabled = false;
     submit.textContent = "Ingresar";
@@ -152,7 +194,7 @@ logoutButton.addEventListener("click", async () => {
 async function boot() {
   if (!isSupabaseConfigured) {
     showLogin(
-      "Proyecto listo. Falta configurar Supabase en js/config.js."
+      "El Sistema no está disponible en este momento. Contacta al administrador."
     );
     return;
   }

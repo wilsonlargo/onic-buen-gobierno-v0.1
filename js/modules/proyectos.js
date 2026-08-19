@@ -187,7 +187,6 @@ async function getProgramas(lineaId) {
 async function getProyectos(programaId) {
   const supabase = requireSupabase();
 
-  // 1. Cargar los Proyectos sin depender del schema cache de relaciones.
   const { data: proyectos, error: proyectosError } = await supabase
     .from("proyectos")
     .select("*")
@@ -206,8 +205,6 @@ async function getProyectos(programaId) {
   const projectIds = rows.map((proyecto) => proyecto.id);
 
   // 2. Cargar directamente la tabla puente.
-  // Esto evita el error PGRST200 causado por una relación nueva
-  // que todavía no esté reflejada en el schema cache de PostgREST.
   const { data: links, error: linksError } = await supabase
     .from("proyecto_mandatos")
     .select("proyecto_id,mandato_id")
@@ -3036,7 +3033,7 @@ export async function renderProyectos(container, navigationTarget = null) {
         <p>
           ${escapeHTML(
             error.message ||
-            "Revisa la conexión con Supabase y confirma que ejecutaste 006_proyecto_mandatos.sql."
+            "No fue posible cargar los Proyectos. Intenta nuevamente o informa al administrador del Sistema."
           )}
         </p>
       </div>

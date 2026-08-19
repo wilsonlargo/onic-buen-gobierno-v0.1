@@ -2,7 +2,9 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#114632">
   <title>Sistema de Buen Gobierno | ONIC</title>
 
@@ -98,13 +100,25 @@
         </button>
       </nav>
 
-      <div class="sidebar-footer">
-        <small>Versión 0.10.0</small>
-      </div>
     </aside>
+
+    <div id="mobileNavScrim" class="mobile-nav-scrim" aria-hidden="true"></div>
 
     <div class="workspace">
       <header class="topbar">
+        <button
+          id="mobileMenuButton"
+          class="mobile-menu-button"
+          type="button"
+          aria-label="Abrir menú principal"
+          aria-controls="mainNav"
+          aria-expanded="false"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"></path>
+          </svg>
+        </button>
+
         <div class="topbar-brand">
           <div class="brand-mark brand-mark-topbar">
             <img src="./assets/branding/onic-logo.png" alt="Logo ONIC">
@@ -137,14 +151,12 @@
 
           <div class="user-meta">
             <span id="userEmail">Usuario</span>
-            <small>Sesión activa</small>
           </div>
           <button id="logoutButton" class="btn btn-secondary" type="button">Salir</button>
         </div>
       </header>
 
       <main id="mainContent" class="main-content" tabindex="-1">
-        <!-- Render dinámico -->
       </main>
     </div>
   </div>
@@ -202,23 +214,17 @@
     </section>
   </div>
 
-  <!-- Supabase JS v2 por CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- Lectura de Excel/CSV para importación masiva -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-<!-- Configuración local -->
 
-  <!-- Generación directa de PDF -->
   <script src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.20/build/pdfmake.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.20/build/vfs_fonts.js"></script>
 
-  <!-- Generación directa de documentos Word (.docx) -->
   <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
 
   <script src="./js/config.js"></script>
 
-  <!-- Aplicación -->
   <script type="module" src="./js/app.js"></script>
 </body>
 </html>

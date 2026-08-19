@@ -1906,7 +1906,7 @@ export async function renderMandatos(container) {
     content.innerHTML = `
       <div class="empty-state">
         <strong>No fue posible cargar Mandatos.</strong>
-        <p>${escapeHTML(error.message || "Revisa la conexión con Supabase.")}</p>
+        <p>${escapeHTML(error.message || "No fue posible cargar los Mandatos. Intenta nuevamente.")}</p>
       </div>
     `;
   }

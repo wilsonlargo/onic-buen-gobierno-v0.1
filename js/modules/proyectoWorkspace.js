@@ -1615,7 +1615,7 @@ export async function renderProyectoWorkspace(container, options) {
     }
   } catch (error) {
     console.error(error);
-    container.innerHTML = `<section class="panel" style="margin-top:0"><p class="eyebrow">Proyecto</p><h2>No fue posible abrir el espacio de trabajo</h2><p class="muted">${escapeHTML(error.message || "Revisa la conexión con Supabase y confirma que ejecutaste la migración 008.")}</p><div style="margin-top:16px"><button id="workspaceErrorBack" class="btn btn-secondary" type="button">Volver a Proyectos</button></div></section>`;
+    container.innerHTML = `<section class="panel" style="margin-top:0"><p class="eyebrow">Proyecto</p><h2>No fue posible abrir el espacio de trabajo</h2><p class="muted">${escapeHTML(error.message || "No fue posible cargar la información del Proyecto. Intenta nuevamente o informa al administrador del Sistema.")}</p><div style="margin-top:16px"><button id="workspaceErrorBack" class="btn btn-secondary" type="button">Volver a Proyectos</button></div></section>`;
     container.querySelector("#workspaceErrorBack").addEventListener("click", onBack);
   }
 }

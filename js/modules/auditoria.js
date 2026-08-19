@@ -345,7 +345,7 @@ async function refreshPanel() {
       list.innerHTML = `
         <div class="audit-empty audit-error">
           <strong>No fue posible cargar las notas.</strong>
-          <p>${escapeHTML(error.message || "Revisa la migración 013.")}</p>
+          <p>No fue posible cargar las notas de Auditoría. Intenta nuevamente.</p>
         </div>
       `;
     }
