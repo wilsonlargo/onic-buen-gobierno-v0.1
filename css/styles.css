@@ -184,6 +184,22 @@ button {
   background: var(--onic-green-700);
 }
 
+.btn-light {
+  background: #ffffff;
+  color: var(--onic-green-900, #123d2d);
+  border: 1px solid rgba(18, 61, 45, 0.12);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.btn-light:hover:not(:disabled) {
+  background: var(--onic-cream-100, #f7f5ed);
+}
+
+.tracking-new-cut-button:not(:disabled) {
+  opacity: 1;
+  cursor: pointer;
+}
+
 .btn-secondary {
   background: var(--surface-soft);
   color: var(--onic-green-900);
@@ -6942,4 +6958,427 @@ textarea {
     width: 100%;
     min-width: 0;
   }
+}
+
+/* ==========================================================
+   CORTES DE SEGUIMIENTO · v0.13.0
+   ========================================================== */
+.tracking-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+}
+
+.tracking-hero-controls {
+  min-width: min(420px, 100%);
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.tracking-hero-controls label {
+  grid-column: 1 / -1;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--onic-cream-300);
+}
+
+.tracking-hero-controls select {
+  min-width: 0;
+}
+
+.tracking-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.tracking-summary-card {
+  min-width: 0;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border-soft, #dfe5e1);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tracking-summary-card.primary {
+  border-color: rgba(15, 66, 48, 0.28);
+  box-shadow: inset 0 3px 0 rgba(15, 66, 48, 0.75);
+}
+
+.tracking-summary-card > span {
+  color: var(--text-muted, #66736c);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.tracking-summary-card > strong {
+  color: var(--onic-green-900, #0f4230);
+  font-size: clamp(1.45rem, 2.4vw, 2rem);
+  line-height: 1.1;
+}
+
+.tracking-summary-card > small {
+  color: var(--text-muted, #66736c);
+  line-height: 1.45;
+}
+
+.tracking-history-panel,
+.dashboard-history-panel,
+.tracking-cuts-panel {
+  margin-top: 18px;
+}
+
+.tracking-panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.tracking-chart-wrap {
+  width: 100%;
+  overflow-x: auto;
+  padding: 6px 0 2px;
+}
+
+.tracking-chart {
+  width: 100%;
+  min-width: 620px;
+  height: auto;
+  display: block;
+}
+
+.tracking-grid-line {
+  stroke: #dfe6e2;
+  stroke-width: 1;
+}
+
+.tracking-axis-label,
+.tracking-x-label {
+  fill: #6d7772;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.tracking-value-label {
+  fill: #163f31;
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 700;
+}
+
+.tracking-progress-line {
+  fill: none;
+  stroke: #0f5b40;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tracking-point circle {
+  fill: #0f5b40;
+  stroke: #fff;
+  stroke-width: 2.5;
+}
+
+.tracking-point.current circle {
+  fill: #fff;
+  stroke: #b27a12;
+  stroke-width: 3;
+}
+
+.tracking-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin-top: 6px;
+  color: var(--text-muted, #66736c);
+  font-size: 0.82rem;
+}
+
+.tracking-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tracking-legend-line,
+.tracking-legend-current {
+  width: 22px;
+  height: 3px;
+  border-radius: 999px;
+  background: #0f5b40;
+  display: inline-block;
+}
+
+.tracking-legend-current {
+  height: 10px;
+  width: 10px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #b27a12;
+}
+
+.tracking-chart-empty {
+  padding: 28px 18px;
+  text-align: center;
+  border: 1px dashed var(--border-soft, #d5ddd8);
+  border-radius: 14px;
+  color: var(--text-muted, #66736c);
+}
+
+.tracking-chart-empty strong {
+  display: block;
+  color: var(--text-main, #24342d);
+  margin-bottom: 6px;
+}
+
+.tracking-cuts-panel #trackingCutsList {
+  display: grid;
+  gap: 14px;
+}
+
+.tracking-cut-card {
+  border: 1px solid var(--border-soft, #dfe5e1);
+  border-radius: 16px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.tracking-cut-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid #edf1ee;
+}
+
+.tracking-cut-header h3 {
+  margin: 0;
+}
+
+.tracking-cut-header p {
+  margin: 6px 0 0;
+  color: var(--text-muted, #66736c);
+  font-size: 0.86rem;
+}
+
+.tracking-cut-title-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.tracking-cut-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.tracking-cut-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.tracking-cut-metrics > div {
+  background: #f7f9f7;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.tracking-cut-metrics span:first-child {
+  color: var(--text-muted, #66736c);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.tracking-cut-metrics strong {
+  font-size: 1.35rem;
+  color: var(--onic-green-900, #0f4230);
+}
+
+.cut-variation {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.cut-variation.positive { color: #2f714c; }
+.cut-variation.negative { color: #9f2637; }
+.cut-variation.neutral { color: #69736e; }
+
+.tracking-cut-note {
+  margin: 0 20px 16px;
+  padding: 12px 14px;
+  border-left: 3px solid #9bb4a7;
+  background: #f7faf8;
+  color: #42534a;
+  line-height: 1.55;
+}
+
+.tracking-cut-details {
+  margin: 0 20px 16px;
+  border-top: 1px solid #edf1ee;
+  padding-top: 12px;
+}
+
+.tracking-cut-details summary {
+  cursor: pointer;
+  color: #24553f;
+  font-weight: 700;
+}
+
+.tracking-cut-vc-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.tracking-cut-vc-item {
+  border: 1px solid #e4eae6;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tracking-cut-vc-item strong {
+  color: #243d32;
+}
+
+.tracking-cut-vc-item span,
+.tracking-cut-vc-item small {
+  color: var(--text-muted, #66736c);
+}
+
+.tracking-cut-footer {
+  padding: 12px 20px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+  color: var(--text-muted, #66736c);
+  font-size: 0.78rem;
+}
+
+.status-chip.attention {
+  background: #fff3d7;
+  color: #885e08;
+  border-color: #e8c571;
+}
+
+@media (max-width: 1050px) {
+  .tracking-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tracking-cut-vc-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .tracking-hero {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tracking-hero-controls {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .tracking-cut-header {
+    flex-direction: column;
+  }
+
+  .tracking-cut-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .tracking-cut-actions .btn {
+    flex: 1 1 170px;
+  }
+}
+
+@media (max-width: 600px) {
+  .tracking-summary-grid,
+  .tracking-cut-metrics,
+  .tracking-cut-vc-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tracking-hero-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .tracking-hero-controls label {
+    grid-column: 1;
+  }
+
+  .tracking-hero-controls .btn,
+  .tracking-hero-controls select {
+    width: 100%;
+  }
+
+  .tracking-cut-header,
+  .tracking-cut-metrics,
+  .tracking-cut-footer {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .tracking-cut-note,
+  .tracking-cut-details {
+    margin-left: 14px;
+    margin-right: 14px;
+  }
+}
+
+
+/* Hotfix v0.13.2 · acción Nuevo corte claramente operativa */
+.tracking-new-cut-button {
+  min-height: 44px;
+  background: var(--onic-green-800);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.28);
+  box-shadow: 0 2px 8px rgba(0,0,0,.12);
+}
+.tracking-new-cut-button:hover:not(:disabled) {
+  background: var(--onic-green-700);
+}
+.tracking-new-cut-button:disabled {
+  background: #d8ddd9;
+  color: #69736d;
+  opacity: .78;
+  box-shadow: none;
+}
+
+/* ==========================================================
+   HOTFIX v0.13.3 · Elementos decorativos no bloquean controles
+   ========================================================== */
+.hero-panel::after {
+  pointer-events: none;
+}
+
+.hero-panel > * {
+  position: relative;
+  z-index: 1;
 }

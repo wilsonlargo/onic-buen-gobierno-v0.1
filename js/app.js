@@ -5,9 +5,10 @@ import { renderConsejerias } from "./modules/consejerias.js";
 import { renderMandatos } from "./modules/mandatos.js";
 import { renderLineas } from "./modules/lineas.js";
 import { renderProgramas } from "./modules/programas.js";
-import { renderProyectos } from "./modules/proyectos.js?v=0.12.1";
+import { renderProyectos } from "./modules/proyectos.js?v=0.13.0";
 import { renderPonderaciones } from "./modules/ponderaciones.js";
-import { renderHistorial } from "./modules/historial.js?v=0.12.1";
+import { renderCortesSeguimiento } from "./modules/cortesSeguimiento.js?v=0.13.3";
+import { renderHistorial } from "./modules/historial.js?v=0.13.0";
 import { renderUsuarios } from "./modules/usuarios.js";
 import { initAuditoria, clearAuditContext } from "./modules/auditoria.js";
 import {
@@ -47,6 +48,7 @@ const views = {
   programas: { title: "Programas", render: renderProgramas },
   proyectos: { title: "Proyectos", render: renderProyectos },
   ponderaciones: { title: "Ponderaciones", render: renderPonderaciones },
+  cortes: { title: "Cortes de seguimiento", render: renderCortesSeguimiento },
   historial: { title: "Historial", render: renderHistorial },
   usuarios: { title: "Usuarios", render: renderUsuarios }
 };
