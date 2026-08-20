@@ -3,6 +3,7 @@ import { updateWithVersion } from "../security.js";
 import { openModal, closeModal } from "../components/modal.js";
 import { setAuditContext, openAuditPanel } from "./auditoria.js";
 import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js";
+import { renderProjectPlanner, plannerColorOptions } from "./projectPlanner.js?v=0.12.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -408,6 +409,9 @@ function openActivityForm({ projectId, record = null, onSaved }) {
             ${option("completada", "Completada", record?.estado === "completada")}
             ${option("cancelada", "Cancelada", record?.estado === "cancelada")}
           </select></div>
+          <div class="form-field"><label>Color en Planeador</label><select name="planeador_color">
+            ${plannerColorOptions().map((item) => option(item.value, item.label, (record?.planeador_color || "") === item.value)).join("")}
+          </select><small class="field-help">El color es una ayuda visual y no modifica el avance ni el estado.</small></div>
         </div>
         <p id="activityMessage" class="form-message"></p>
         <div class="form-actions"><button id="cancelActivity" class="btn btn-secondary" type="button">Cancelar</button><button class="btn btn-primary" type="submit">${editing ? "Guardar cambios" : "Crear actividad"}</button></div>
@@ -428,6 +432,7 @@ function openActivityForm({ projectId, record = null, onSaved }) {
       fecha_inicio: data.get("fecha_inicio") || null,
       fecha_fin: data.get("fecha_fin") || null,
       estado: data.get("estado"),
+      planeador_color: data.get("planeador_color") || null,
       orden: Number(data.get("orden") || 0)
     };
     if (!payload.nombre) { message.textContent = "El nombre de la actividad es obligatorio."; return; }
@@ -715,8 +720,11 @@ export async function renderProyectoWorkspace(container, options) {
   let budgetItems = [];
   let evidence = [];
   let projectTab = options.initialProjectTab || "perfil";
+  let plannerView = "matriz";
+  let plannerScale = "mensual";
   let currentActivityId = options.initialActivityId || null;
   let activityTab = options.initialActivityTab || "general";
+  let activityReturnTab = projectTab === "planeador" ? "planeador" : "actividades";
   const initialAnchor = options.initialAnchor || null;
   let showToast = () => {};
 
@@ -787,6 +795,7 @@ export async function renderProyectoWorkspace(container, options) {
     return `
       <nav class="project-workspace-tabs" aria-label="Secciones del Proyecto">
         <button class="${projectTab === "perfil" ? "active" : ""}" data-project-tab="perfil" type="button">Perfil</button>
+        <button class="${projectTab === "planeador" ? "active" : ""}" data-project-tab="planeador" type="button">Planeador</button>
         <button class="${projectTab === "actividades" ? "active" : ""}" data-project-tab="actividades" type="button">Actividades <span>${activities.length}</span></button>
         <button class="${projectTab === "seguimiento" ? "active" : ""}" data-project-tab="seguimiento" type="button">Seguimiento</button>
       </nav>`;
@@ -1020,6 +1029,118 @@ export async function renderProyectoWorkspace(container, options) {
     });
   }
 
+  function openPlannerActivityAudit(activity) {
+    openAuditPanel({
+      newNote: true,
+      contextOverride: {
+        vigenciaId: vigencia.id,
+        vigenciaNombre: vigencia.nombre,
+        entidadTipo: "actividad",
+        entidadId: activity.id,
+        entidadNombre: activity.nombre,
+        seccion: "general",
+        ruta: `${vigencia.nombre} › ${vigenciaConsejeria.consejerias.nombre_corto} › ${linea.nombre} › ${programa.nombre} › ${project.nombre} › ${activity.nombre}`,
+        navigation: {
+          ...baseAuditNavigation(),
+          project_tab: "planeador",
+          actividad_id: activity.id,
+          actividad_codigo: activity.codigo || "",
+          actividad_nombre: activity.nombre,
+          activity_tab: "general"
+        },
+        sectionOptions: [
+          { value: "general", label: "General", navigation: { activity_tab: "general" } },
+          { value: "indicadores", label: "Indicadores", navigation: { activity_tab: "indicadores" } },
+          { value: "presupuesto", label: "Presupuesto", navigation: { activity_tab: "presupuesto" } },
+          { value: "evidencias", label: "Evidencias", navigation: { activity_tab: "evidencias" } },
+          { value: "seguimiento", label: "Seguimiento", navigation: { activity_tab: "seguimiento" } }
+        ]
+      }
+    });
+  }
+
+  function openPlannerColorDialog(activity, colorOptions) {
+    openModal({
+      title: "Color de la actividad",
+      content: `
+        <div class="planner-color-dialog">
+          <p>Selecciona un color para diferenciar <strong>${escapeHTML(activity.codigo || activity.nombre)}</strong> en el Planeador. El color no modifica el avance, el estado ni la ponderación.</p>
+          <div class="planner-color-grid">
+            ${colorOptions.map((item) => `
+              <button class="planner-color-choice edit-activity-color ${(activity.planeador_color || "") === item.value ? "selected" : ""}" type="button" data-planner-color="${escapeHTML(item.value)}">
+                <span style="background:${item.hex}"></span>
+                <strong>${escapeHTML(item.label)}</strong>
+              </button>`).join("")}
+          </div>
+          <p id="plannerColorMessage" class="form-message"></p>
+          <div class="form-actions"><button id="cancelPlannerColor" class="btn btn-secondary" type="button">Cancelar</button></div>
+        </div>`
+    });
+    document.querySelector("#cancelPlannerColor")?.addEventListener("click", closeModal);
+    document.querySelectorAll("[data-planner-color]").forEach((button) => button.addEventListener("click", async () => {
+      const message = document.querySelector("#plannerColorMessage");
+      document.querySelectorAll("[data-planner-color]").forEach((item) => { item.disabled = true; });
+      try {
+        await updateActivity(activity, { planeador_color: button.dataset.plannerColor || null });
+        closeModal();
+        await reloadOperationalData();
+        renderPlanner();
+        showToast("Color del Planeador actualizado.");
+      } catch (error) {
+        console.error(error);
+        if (message) message.textContent = error.message || "No fue posible actualizar el color.";
+        document.querySelectorAll("[data-planner-color]").forEach((item) => { item.disabled = false; });
+      }
+    }));
+  }
+
+  function renderPlanner() {
+    const body = container.querySelector("#projectWorkspaceBody");
+    const metrics = projectMetrics();
+    renderProjectPlanner({
+      container: body,
+      project,
+      activities,
+      indicators,
+      budgetItems,
+      evidence,
+      metrics,
+      view: plannerView,
+      scale: plannerScale,
+      onViewChange: (view) => { plannerView = view; renderPlanner(); },
+      onScaleChange: (scale) => { plannerScale = scale; renderPlanner(); },
+      onOpenActivity: (activityId, tab = "general") => {
+        activityReturnTab = "planeador";
+        currentActivityId = activityId;
+        activityTab = tab;
+        renderActivityWorkspace();
+      },
+      onEditActivity: (activity) => {
+        openActivityForm({
+          projectId: project.id,
+          record: activity,
+          onSaved: async () => {
+            await reloadOperationalData();
+            renderPlanner();
+            showToast("Planificación actualizada.");
+          }
+        });
+      },
+      onNewActivity: () => {
+        openActivityForm({
+          projectId: project.id,
+          onSaved: async () => {
+            await reloadOperationalData();
+            renderPlanner();
+            showToast("Actividad creada.");
+          }
+        });
+      },
+      onAuditActivity: openPlannerActivityAudit,
+      onChangeColor: openPlannerColorDialog
+    });
+  }
+
   function renderActivities() {
     const body = container.querySelector("#projectWorkspaceBody");
     const metrics = projectMetrics();
@@ -1070,7 +1191,7 @@ export async function renderProyectoWorkspace(container, options) {
     body.querySelector("#newActivityButton").addEventListener("click", () => {
       openActivityForm({ projectId: project.id, onSaved: async () => { await reloadOperationalData(); renderActivities(); showToast("Actividad creada."); } });
     });
-    body.querySelectorAll(".open-activity").forEach((button) => button.addEventListener("click", () => { currentActivityId = button.dataset.id; activityTab = "general"; renderActivityWorkspace(); }));
+    body.querySelectorAll(".open-activity").forEach((button) => button.addEventListener("click", () => { activityReturnTab = "actividades"; currentActivityId = button.dataset.id; activityTab = "general"; renderActivityWorkspace(); }));
     body.querySelectorAll(".audit-activity-note").forEach((button) => button.addEventListener("click", () => {
       const activity = activities.find((item) => item.id === button.dataset.id);
       if (!activity) return;
@@ -1157,6 +1278,7 @@ export async function renderProyectoWorkspace(container, options) {
   function syncProjectAuditContext() {
     const labels = {
       perfil: "Perfil",
+      planeador: "Planeador",
       actividades: "Actividades",
       seguimiento: "Seguimiento"
     };
@@ -1188,6 +1310,11 @@ export async function renderProyectoWorkspace(container, options) {
           }
         },
         {
+          value: "planeador",
+          label: "Planeador",
+          navigation: { project_tab: "planeador" }
+        },
+        {
           value: "actividades",
           label: "Actividades",
           navigation: { project_tab: "actividades" }
@@ -1205,7 +1332,8 @@ export async function renderProyectoWorkspace(container, options) {
     if (currentActivityId) { renderActivityWorkspace(); return; }
     syncProjectAuditContext();
     container.querySelectorAll("[data-project-tab]").forEach((button) => button.classList.toggle("active", button.dataset.projectTab === projectTab));
-    if (projectTab === "actividades") renderActivities();
+    if (projectTab === "planeador") renderPlanner();
+    else if (projectTab === "actividades") renderActivities();
     else if (projectTab === "seguimiento") renderProjectTracking();
     else renderProfile();
   }
@@ -1240,7 +1368,7 @@ export async function renderProyectoWorkspace(container, options) {
 
   function renderActivityWorkspace() {
     const activity = currentActivity();
-    if (!activity) { currentActivityId = null; projectTab = "actividades"; renderShell(); return; }
+    if (!activity) { currentActivityId = null; projectTab = activityReturnTab; renderShell(); return; }
     container.innerHTML = `
       <section class="project-workspace activity-workspace">
         <button id="backToProjectActivities" class="workspace-back-button" type="button">${arrowIcon()} Volver al Proyecto</button>
@@ -1250,7 +1378,7 @@ export async function renderProyectoWorkspace(container, options) {
       </section>
       <div id="projectWorkspaceToast" class="app-toast hidden" role="status"></div>`;
     bindToast();
-    container.querySelector("#backToProjectActivities").addEventListener("click", () => { currentActivityId = null; projectTab = "actividades"; renderShell(); });
+    container.querySelector("#backToProjectActivities").addEventListener("click", () => { currentActivityId = null; projectTab = activityReturnTab; renderShell(); });
     container.querySelectorAll("[data-activity-tab]").forEach((button) => button.addEventListener("click", () => { activityTab = button.dataset.activityTab; renderActivityTab(); }));
     renderActivityTab();
   }
@@ -1270,6 +1398,7 @@ export async function renderProyectoWorkspace(container, options) {
             <div class="form-field"><label>Fecha de inicio</label><input name="fecha_inicio" type="date" value="${escapeHTML(activity.fecha_inicio || "")}"></div>
             <div class="form-field"><label>Fecha de cierre</label><input name="fecha_fin" type="date" value="${escapeHTML(activity.fecha_fin || "")}"></div>
             <div class="form-field"><label>Estado</label><select name="estado">${option("borrador", "Borrador", activity.estado === "borrador")}${option("programada", "Programada", activity.estado === "programada")}${option("en_ejecucion", "En ejecución", activity.estado === "en_ejecucion")}${option("suspendida", "Suspendida", activity.estado === "suspendida")}${option("completada", "Completada", activity.estado === "completada")}${option("cancelada", "Cancelada", activity.estado === "cancelada")}</select></div>
+            <div class="form-field"><label>Color en Planeador</label><select name="planeador_color">${plannerColorOptions().map((item) => option(item.value, item.label, (activity.planeador_color || "") === item.value)).join("")}</select></div>
           </div>
         </section>
         <div class="workspace-form-footer"><p id="activityGeneralMessage" class="form-message"></p><button class="btn btn-primary" type="submit">Guardar actividad</button></div>
@@ -1284,7 +1413,7 @@ export async function renderProyectoWorkspace(container, options) {
       if (start && end && end < start) { message.textContent = "La fecha final no puede ser anterior a la fecha inicial."; return; }
       const submit = form.querySelector('button[type="submit"]'); submit.disabled = true; submit.textContent = "Guardando…";
       try {
-        await updateActivity(activity, { codigo: data.get("codigo")?.trim() || null, nombre: data.get("nombre")?.trim(), descripcion: data.get("descripcion")?.trim() || null, responsable: data.get("responsable")?.trim() || null, fecha_inicio: start, fecha_fin: end, estado: data.get("estado"), orden: Number(data.get("orden") || 0) });
+        await updateActivity(activity, { codigo: data.get("codigo")?.trim() || null, nombre: data.get("nombre")?.trim(), descripcion: data.get("descripcion")?.trim() || null, responsable: data.get("responsable")?.trim() || null, fecha_inicio: start, fecha_fin: end, estado: data.get("estado"), planeador_color: data.get("planeador_color") || null, orden: Number(data.get("orden") || 0) });
         await refreshCurrentActivityData();
         renderActivityWorkspace();
         showToast("Actividad actualizada.");

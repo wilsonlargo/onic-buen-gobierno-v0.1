@@ -1,7 +1,7 @@
 import { requireSupabase } from "../supabaseClient.js";
 import { updateWithVersion } from "../security.js";
 import { openModal, closeModal } from "../components/modal.js";
-import { renderProyectoWorkspace } from "./proyectoWorkspace.js";
+import { renderProyectoWorkspace } from "./proyectoWorkspace.js?v=0.12.0";
 import { setAuditContext, openAuditPanel } from "./auditoria.js";
 
 function escapeHTML(value = "") {
@@ -2582,6 +2582,7 @@ export async function renderProyectos(container, navigationTarget = null) {
               sectionOptions: [
                 { value: "perfil", label: "Perfil del Proyecto", navigation: { project_tab: "perfil" } },
                 { value: "objetivo", label: "Objetivo del Proyecto", navigation: { project_tab: "perfil", anchor: "projectObjectiveField" } },
+                { value: "planeador", label: "Planeador", navigation: { project_tab: "planeador" } },
                 { value: "actividades", label: "Actividades", navigation: { project_tab: "actividades" } },
                 { value: "seguimiento", label: "Seguimiento", navigation: { project_tab: "seguimiento" } }
               ]

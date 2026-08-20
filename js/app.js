@@ -5,7 +5,7 @@ import { renderConsejerias } from "./modules/consejerias.js";
 import { renderMandatos } from "./modules/mandatos.js";
 import { renderLineas } from "./modules/lineas.js";
 import { renderProgramas } from "./modules/programas.js";
-import { renderProyectos } from "./modules/proyectos.js";
+import { renderProyectos } from "./modules/proyectos.js?v=0.12.0";
 import { renderPonderaciones } from "./modules/ponderaciones.js";
 import { renderHistorial } from "./modules/historial.js";
 import { renderUsuarios } from "./modules/usuarios.js";
