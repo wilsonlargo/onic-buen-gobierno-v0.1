@@ -1,6 +1,6 @@
 import { supabaseClient, isSupabaseConfigured } from "./supabaseClient.js";
-import { renderInicio } from "./modules/inicio.js";
-import { renderVigencias } from "./modules/vigencias.js";
+import { renderInicio } from "./modules/inicio.js?v=0.14.0";
+import { renderVigencias } from "./modules/vigencias.js?v=0.14.0";
 import { renderConsejerias } from "./modules/consejerias.js";
 import { renderMandatos } from "./modules/mandatos.js";
 import { renderLineas } from "./modules/lineas.js";
@@ -8,7 +8,8 @@ import { renderProgramas } from "./modules/programas.js";
 import { renderProyectos } from "./modules/proyectos.js?v=0.13.0";
 import { renderPonderaciones } from "./modules/ponderaciones.js";
 import { renderCortesSeguimiento } from "./modules/cortesSeguimiento.js?v=0.13.3";
-import { renderHistorial } from "./modules/historial.js?v=0.13.0";
+import { renderAlertasTareas } from "./modules/alertasTareas.js?v=0.14.0";
+import { renderHistorial } from "./modules/historial.js?v=0.14.0";
 import { renderUsuarios } from "./modules/usuarios.js";
 import { initAuditoria, clearAuditContext } from "./modules/auditoria.js";
 import {
@@ -49,6 +50,7 @@ const views = {
   proyectos: { title: "Proyectos", render: renderProyectos },
   ponderaciones: { title: "Ponderaciones", render: renderPonderaciones },
   cortes: { title: "Cortes de seguimiento", render: renderCortesSeguimiento },
+  alertas: { title: "Alertas y tareas", render: (container, target) => renderAlertasTareas(container, target, { onNavigate: navigate }) },
   historial: { title: "Historial", render: renderHistorial },
   usuarios: { title: "Usuarios", render: renderUsuarios }
 };
@@ -176,6 +178,12 @@ document.addEventListener("keydown", (event) => {
 
 window.addEventListener("resize", () => {
   if (!isMobileLayout()) setMobileNav(false);
+});
+
+window.addEventListener("app:navigate", async (event) => {
+  const detail = event?.detail || {};
+  if (!detail.view) return;
+  await navigate(detail.view, detail.target || detail.navigationTarget || null);
 });
 
 loginForm.addEventListener("submit", async (event) => {

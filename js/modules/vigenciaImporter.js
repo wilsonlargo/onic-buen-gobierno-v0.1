@@ -476,7 +476,7 @@ function validatePayload(payload) {
     payload.metadata?.tipo === "copia_seguridad"
   ) {
     warnings.push(
-      "Copia de seguridad detectada. La Vigencia se restaurará conservando sus ponderaciones registradas."
+      "Copia de seguridad detectada. La Vigencia se restaurará conservando sus ponderaciones, cortes de seguimiento y compromisos registrados."
     );
   }
 
@@ -504,7 +504,9 @@ function countPayload(payload) {
     seguimientosIndicador: 0,
     rubros: 0,
     evidencias: 0,
-    seguimientosActividad: 0
+    seguimientosActividad: 0,
+    cortes: getArray(payload.cortes_seguimiento).length,
+    compromisos: getArray(payload.compromisos_tareas).length
   };
 
   getArray(payload.consejerias).forEach(
@@ -1048,6 +1050,14 @@ export function openVigenciaImportDialog({
             "Documentos",
             counts.documentos
           )}
+          ${previewMetric(
+            "Cortes",
+            counts.cortes
+          )}
+          ${previewMetric(
+            "Compromisos",
+            counts.compromisos
+          )}
         </div>
 
         <details class="json-import-details">
@@ -1209,6 +1219,14 @@ export function openVigenciaImportDialog({
               ${previewMetric(
                 "Indicadores",
                 summary.indicadores
+              )}
+              ${previewMetric(
+                "Cortes restaurados",
+                data?.cortes_seguimiento_restaurados || 0
+              )}
+              ${previewMetric(
+                "Compromisos restaurados",
+                data?.compromisos_restaurados || 0
               )}
             </div>
 

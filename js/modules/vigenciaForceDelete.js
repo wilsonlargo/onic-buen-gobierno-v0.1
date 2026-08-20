@@ -132,7 +132,10 @@ export async function openForceDeleteVigenciaDialog({
     Number(summary.rubros_presupuesto || 0) +
     Number(summary.evidencias || 0) +
     Number(summary.seguimientos_actividad || 0) +
-    Number(summary.consejerias_vigencia || 0);
+    Number(summary.consejerias_vigencia || 0) +
+    Number(summary.cortes_seguimiento || 0) +
+    Number(summary.cortes_consejerias || 0) +
+    Number(summary.compromisos_tareas || 0);
 
   openModal({
     title: "Eliminar Vigencia completa",
@@ -247,6 +250,21 @@ export async function openForceDeleteVigenciaDialog({
           ${summaryCard(
             "Documentos de Biblioteca",
             summary.documentos_biblioteca
+          )}
+
+          ${summaryCard(
+            "Cortes de seguimiento",
+            summary.cortes_seguimiento
+          )}
+
+          ${summaryCard(
+            "Fotografías por Consejería",
+            summary.cortes_consejerias
+          )}
+
+          ${summaryCard(
+            "Compromisos y tareas",
+            summary.compromisos_tareas
           )}
         </div>
 

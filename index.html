@@ -11,7 +11,7 @@
   <link rel="icon" href="./assets/branding/onic-logo.png" type="image/png">
   <link rel="apple-touch-icon" href="./assets/branding/onic-logo.png">
   <link rel="stylesheet" href="./css/variables.css?v=0.13.0">
-  <link rel="stylesheet" href="./css/styles.css?v=0.13.3">
+  <link rel="stylesheet" href="./css/styles.css?v=0.14.0">
 </head>
 <body>
 
@@ -102,6 +102,12 @@
         <button class="nav-item" data-view="cortes">
           <span class="nav-icon">◔</span>
           <span>Cortes</span>
+        </button>
+
+        <button class="nav-item" data-view="alertas">
+          <span class="nav-icon">!</span>
+          <span>Alertas y tareas</span>
+          <span id="alertsNavBadge" class="nav-count-badge hidden">0</span>
         </button>
 
         <button class="nav-item security-hidden" data-view="historial">
@@ -242,6 +248,6 @@
 
   <script src="./js/config.js"></script>
 
-  <script type="module" src="./js/app.js?v=0.13.3"></script>
+  <script type="module" src="./js/app.js?v=0.14.0"></script>
 </body>
 </html>

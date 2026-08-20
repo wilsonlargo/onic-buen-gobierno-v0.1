@@ -1,6 +1,8 @@
 import { requireSupabase } from "../supabaseClient.js";
 import { setAuditContext } from "./auditoria.js";
 import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js";
+import { loadOfficialTrackingSeries, renderTrackingChart } from "./cortesSeguimiento.js?v=0.13.1";
+import { loadAlertSummary, updateAlertsNavBadge } from "./alertasTareas.js?v=0.14.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -934,6 +936,33 @@ export async function renderInicio(container, navigationTarget = null) {
         </div>
       </section>
     </div>
+
+    <section class="panel dashboard-history-panel">
+      <div class="panel-heading tracking-panel-heading">
+        <div>
+          <p class="eyebrow">Evolución del Plan</p>
+          <h2>Histórico de avance</h2>
+          <p class="muted">Compara los cortes aprobados o cerrados con el valor actual de la Vigencia.</p>
+        </div>
+      </div>
+      <div id="inicioHistoricalChart">
+        <div class="empty-state">Cargando histórico…</div>
+      </div>
+    </section>
+
+    <section class="panel dashboard-alerts-panel">
+      <div class="panel-heading tracking-panel-heading">
+        <div>
+          <p class="eyebrow">Seguimiento operativo</p>
+          <h2>Alertas y compromisos</h2>
+          <p class="muted">Identifica asuntos que requieren atención sin alterar los cálculos de avance.</p>
+        </div>
+        <button id="inicioOpenAlerts" class="btn btn-secondary" type="button">Abrir centro</button>
+      </div>
+      <div id="inicioAlertsSummary">
+        <div class="empty-state">Cargando alertas…</div>
+      </div>
+    </section>
   `;
 
   const selector =
@@ -960,6 +989,31 @@ export async function renderInicio(container, navigationTarget = null) {
     container.querySelector(
       "#inicioProgressPanel"
     );
+
+  const historicalHost =
+    container.querySelector(
+      "#inicioHistoricalChart"
+    );
+
+  const alertsHost =
+    container.querySelector(
+      "#inicioAlertsSummary"
+    );
+
+  const openAlertsButton =
+    container.querySelector(
+      "#inicioOpenAlerts"
+    );
+
+  openAlertsButton?.addEventListener("click", () => {
+    if (!selectedVigenciaId) return;
+    window.dispatchEvent(new CustomEvent("app:navigate", {
+      detail: {
+        view: "alertas",
+        target: { vigencia_id: selectedVigenciaId, tab: "alertas" }
+      }
+    }));
+  });
 
   function currentVigencia() {
     return vigencias.find(
@@ -1081,6 +1135,9 @@ export async function renderInicio(container, navigationTarget = null) {
       `;
 
       progressHost.innerHTML = "";
+      historicalHost.innerHTML = `<div class="empty-state">Selecciona una Vigencia.</div>`;
+      alertsHost.innerHTML = `<div class="empty-state">Selecciona una Vigencia.</div>`;
+      updateAlertsNavBadge(0);
       return;
     }
 
@@ -1097,6 +1154,9 @@ export async function renderInicio(container, navigationTarget = null) {
         </div>
       </section>
     `;
+
+    historicalHost.innerHTML = `<div class="empty-state">Cargando histórico…</div>`;
+    alertsHost.innerHTML = `<div class="empty-state">Cargando alertas…</div>`;
 
     try {
       const data =
@@ -1143,6 +1203,45 @@ export async function renderInicio(container, navigationTarget = null) {
 
       progressHost.innerHTML =
         renderProgressPanel(metrics);
+
+      try {
+        const historicalPoints =
+          await loadOfficialTrackingSeries(selectedVigenciaId);
+
+        historicalHost.innerHTML =
+          renderTrackingChart(
+            historicalPoints,
+            {
+              includeCurrent: {
+                progress: metrics.progress,
+                coverage: metrics.coverage
+              },
+              compact: true
+            }
+          );
+      } catch (historyError) {
+        console.error(historyError);
+        historicalHost.innerHTML = `
+          <div class="tracking-chart-empty">
+            <strong>No fue posible cargar el histórico de cortes.</strong>
+            <p>El avance actual continúa disponible normalmente.</p>
+          </div>
+        `;
+      }
+
+      try {
+        const alertSummary = await loadAlertSummary(selectedVigenciaId);
+        alertsHost.innerHTML = `
+          <div class="dashboard-alerts-summary">
+            <article class="dashboard-alert-metric high"><span>Urgentes</span><strong>${alertSummary.altas}</strong></article>
+            <article class="dashboard-alert-metric medium"><span>Atención</span><strong>${alertSummary.medias}</strong></article>
+            <article class="dashboard-alert-metric tasks"><span>Compromisos abiertos</span><strong>${alertSummary.tareasAbiertas}</strong><small>${alertSummary.tareasVencidas ? `${alertSummary.tareasVencidas} vencido${alertSummary.tareasVencidas === 1 ? "" : "s"}` : "Sin vencidos"}</small></article>
+          </div>
+        `;
+      } catch (alertsError) {
+        console.error(alertsError);
+        alertsHost.innerHTML = `<div class="tracking-chart-empty"><strong>No fue posible cargar las alertas.</strong><p>El tablero de avance continúa disponible normalmente.</p></div>`;
+      }
     } catch (error) {
       console.error(error);
 
@@ -1162,6 +1261,8 @@ export async function renderInicio(container, navigationTarget = null) {
       `;
 
       progressHost.innerHTML = "";
+      historicalHost.innerHTML = `<div class="tracking-chart-empty"><strong>Histórico no disponible.</strong></div>`;
+      alertsHost.innerHTML = `<div class="tracking-chart-empty"><strong>Alertas no disponibles.</strong></div>`;
     }
   }
 
@@ -1184,6 +1285,9 @@ export async function renderInicio(container, navigationTarget = null) {
       `;
 
       progressHost.innerHTML = "";
+      historicalHost.innerHTML = `<div class="empty-state">Todavía no hay Vigencias.</div>`;
+      alertsHost.innerHTML = `<div class="empty-state">Todavía no hay Vigencias.</div>`;
+      updateAlertsNavBadge(0);
       return;
     }
 

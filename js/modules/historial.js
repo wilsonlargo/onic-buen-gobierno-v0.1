@@ -25,7 +25,19 @@ const ACTION_LABELS = {
   restaurar_vigencia: "Restauró Vigencia",
   exportar_historial: "Exportó historial",
   exportar_planeador: "Exportó Planeador",
-  generar_documento: "Generó documento"
+  generar_documento: "Generó documento",
+  crear_corte: "Creó corte de seguimiento",
+  actualizar_corte: "Actualizó fotografía del corte",
+  corte_revision: "Pasó corte a revisión",
+  aprobar_corte: "Aprobó corte de seguimiento",
+  cerrar_corte: "Cerró corte de seguimiento",
+  eliminar_corte: "Eliminó corte de seguimiento",
+  crear_compromiso: "Creó compromiso",
+  actualizar_compromiso: "Actualizó compromiso",
+  completar_compromiso: "Completó compromiso",
+  cancelar_compromiso: "Canceló compromiso",
+  reabrir_compromiso: "Reabrió compromiso",
+  eliminar_compromiso: "Eliminó compromiso"
 };
 
 const ENTITY_LABELS = {
@@ -50,6 +62,8 @@ const ENTITY_LABELS = {
   ponderacion: "Ponderación",
   usuario: "Usuario",
   asignacion_usuario: "Asignación de usuario",
+  corte_seguimiento: "Corte de seguimiento",
+  compromiso: "Compromiso / tarea",
   sesion: "Sesión",
   sistema: "Sistema"
 };
@@ -82,6 +96,8 @@ const FIELD_LABELS = {
   valor_actual: "Valor actual",
   sentido: "Sentido",
   fecha_corte: "Fecha de corte",
+  avance_vigencia: "Avance de la Vigencia",
+  cobertura_vigencia: "Cobertura de medición",
   valor: "Valor",
   observacion: "Observación",
   rubro: "Rubro",
@@ -99,7 +115,12 @@ const FIELD_LABELS = {
   respuesta: "Respuesta / acción",
   rol: "Rol",
   email: "Correo",
-  lema: "Lema"
+  lema: "Lema",
+  prioridad: "Prioridad",
+  fecha_limite: "Fecha límite",
+  resultado_cierre: "Resultado / cierre",
+  responsable_nombre: "Responsable",
+  responsable_email: "Correo del responsable"
 };
 
 const HIDDEN_FIELDS = new Set([
@@ -123,6 +144,10 @@ const HIDDEN_FIELDS = new Set([
   "actividad_id",
   "indicador_id",
   "usuario_id",
+  "responsable_usuario_id",
+  "navigation",
+  "alerta_clave",
+  "entidad_id",
   "created_by"
 ]);
 

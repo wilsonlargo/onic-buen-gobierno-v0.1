@@ -1,8 +1,8 @@
 import { requireSupabase } from "../supabaseClient.js";
 import { openModal, closeModal } from "../components/modal.js";
-import { openVigenciaImportDialog } from "./vigenciaImporter.js";
-import { openForceDeleteVigenciaDialog } from "./vigenciaForceDelete.js";
-import { openVigenciaBackupDialog } from "./vigenciaBackup.js";
+import { openVigenciaImportDialog } from "./vigenciaImporter.js?v=0.14.0";
+import { openForceDeleteVigenciaDialog } from "./vigenciaForceDelete.js?v=0.14.0";
+import { openVigenciaBackupDialog } from "./vigenciaBackup.js?v=0.14.0";
 import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js";
 
 function escapeHTML(value = "") {

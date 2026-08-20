@@ -89,7 +89,7 @@ export function openVigenciaBackupDialog({
             Se generará un archivo con toda la estructura de esta
             Vigencia: Consejerías, Mandatos, Biblioteca, Líneas,
             Programas, Proyectos, Actividades, Indicadores,
-            seguimientos, presupuesto y evidencias.
+            seguimientos, presupuesto, evidencias, cortes históricos y compromisos.
           </p>
         </div>
       </div>
