@@ -297,6 +297,483 @@ function timelineHTML({ project, activities, metrics, range, scale }) {
     <div class="planner-legend"><span><i class="planner-legend-swatch plan"></i>Periodo programado</span><span><i class="planner-legend-swatch progress"></i>Avance técnico dentro del periodo</span>${today !== null ? `<span><i class="planner-legend-line"></i>Fecha actual</span>` : ""}</div>`;
 }
 
+function safeFilename(value = "") {
+  return String(value || "planeador")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 110) || "planeador";
+}
+
+function lightenHex(hex, amount = 0.82) {
+  const match = /^#([0-9a-f]{6})$/i.exec(hex || "");
+  if (!match) return "#E7ECE9";
+  const raw = match[1];
+  const parts = [0, 2, 4].map((offset) => parseInt(raw.slice(offset, offset + 2), 16));
+  const mixed = parts.map((channel) => Math.round(channel + (255 - channel) * amount));
+  return `#${mixed.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function plannerExportContext(context = {}) {
+  return {
+    vigencia: context.vigenciaNombre || "—",
+    consejeria: context.consejeriaNombre || "—",
+    linea: context.lineaNombre || "—",
+    programa: context.programaNombre || "—"
+  };
+}
+
+function activityExportStats({ activities, indicators, evidence, budgetItems, metrics }) {
+  const indicatorCounts = new Map();
+  indicators.forEach((item) => indicatorCounts.set(item.actividad_id, (indicatorCounts.get(item.actividad_id) || 0) + 1));
+  const evidenceCounts = new Map();
+  evidence.filter((item) => item.estado === "activa").forEach((item) => evidenceCounts.set(item.actividad_id, (evidenceCounts.get(item.actividad_id) || 0) + 1));
+
+  return activities.map((activity, index) => {
+    const progress = metrics.progressByActivity.get(activity.id);
+    const status = timingStatus(activity, progress);
+    const programmed = budgetItems
+      .filter((item) => item.actividad_id === activity.id && item.estado === "activo")
+      .reduce((sum, item) => sum + Number(item.programado || 0), 0);
+    return {
+      activity,
+      index,
+      color: colorForActivity(activity, index),
+      progress,
+      status,
+      indicatorCount: indicatorCounts.get(activity.id) || 0,
+      evidenceCount: evidenceCounts.get(activity.id) || 0,
+      programmed
+    };
+  });
+}
+
+function periodIntersectsActivity(activity, period) {
+  const start = parseDate(activity.fecha_inicio);
+  const end = parseDate(activity.fecha_fin);
+  if (!start || !end) return false;
+  const activityEnd = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999);
+  return start <= period.end && activityEnd >= period.start;
+}
+
+function activePeriodIndices(activity, periods) {
+  const indices = [];
+  periods.forEach((period, index) => {
+    if (periodIntersectsActivity(activity, period)) indices.push(index);
+  });
+  return indices;
+}
+
+function periodContainsToday(period) {
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  return today >= period.start && today <= period.end;
+}
+
+async function logoDataUrl() {
+  try {
+    const response = await fetch("./assets/branding/onic-logo.png", { cache: "no-store" });
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.warn("No fue posible cargar el logo para el Planeador.", error);
+    return null;
+  }
+}
+
+function pdfHeader(logo, title) {
+  return {
+    columns: [
+      ...(logo ? [{ image: logo, width: 30, margin: [0, 0, 10, 0] }] : []),
+      {
+        stack: [
+          { text: "ORGANIZACIÓN NACIONAL INDÍGENA DE COLOMBIA - ONIC", bold: true, color: "#0F4230", fontSize: 9 },
+          { text: title, bold: true, color: "#1C2B24", fontSize: 15, margin: [0, 3, 0, 0] }
+        ]
+      }
+    ],
+    margin: [0, 0, 0, 12]
+  };
+}
+
+function pdfMetadata(project, context, viewLabel, scaleLabel = null) {
+  const c = plannerExportContext(context);
+  const rows = [
+    ["Proyecto", project.nombre || "—", "Vigencia", c.vigencia],
+    ["Consejería", c.consejeria, "Programa", c.programa],
+    ["Línea de Acción", c.linea, "Vista", `${viewLabel}${scaleLabel ? ` · ${scaleLabel}` : ""}`],
+    ["Periodo del Proyecto", `${formatDate(project.fecha_inicio)} – ${formatDate(project.fecha_fin)}`, "Generado", new Intl.DateTimeFormat("es-CO", { day: "2-digit", month: "long", year: "numeric" }).format(new Date())]
+  ];
+  return {
+    table: {
+      widths: [78, "*", 74, "*"],
+      body: rows.map((row) => row.map((cell, index) => ({
+        text: String(cell ?? "—"),
+        bold: index % 2 === 0,
+        color: index % 2 === 0 ? "#0F4230" : "#26312C",
+        fontSize: 7.4,
+        margin: [4, 3, 4, 3]
+      })))
+    },
+    layout: {
+      hLineColor: () => "#DCE5E0",
+      vLineColor: () => "#DCE5E0"
+    },
+    margin: [0, 0, 0, 12]
+  };
+}
+
+function pdfSummary(metrics, activities, range) {
+  const duration = range ? monthDifferenceInclusive(range.start, range.end) : null;
+  const values = [
+    ["Duración", duration ? `${duration} ${duration === 1 ? "mes" : "meses"}` : "—"],
+    ["Actividades", String(activities.length)],
+    ["Cobertura técnica", metrics.includedCount ? `${metrics.measurableCount}/${metrics.includedCount}` : "—"],
+    ["Avance técnico", formatPercent(metrics.technicalProgress)]
+  ];
+  return {
+    columns: values.map(([label, value]) => ({
+      width: "*",
+      stack: [
+        { text: label, fontSize: 6.8, bold: true, color: "#66716B" },
+        { text: value, fontSize: 12, bold: true, color: "#0F4230", margin: [0, 2, 0, 0] }
+      ],
+      margin: [6, 5, 6, 5]
+    })),
+    columnGap: 5,
+    margin: [0, 0, 0, 12]
+  };
+}
+
+async function exportPlannerPdf({ project, activities, indicators, budgetItems, evidence, metrics, view, scale, context }) {
+  if (!window.pdfMake || typeof window.pdfMake.createPdf !== "function") {
+    throw new Error("El generador PDF no está disponible. Recarga la página y vuelve a intentarlo.");
+  }
+  const range = deriveTimelineRange(project, activities);
+  const stats = activityExportStats({ activities, indicators, evidence, budgetItems, metrics });
+  const logo = await logoDataUrl();
+  const content = [
+    pdfHeader(logo, view === "cronograma" ? "Planeador del Proyecto - Cronograma" : "Planeador del Proyecto - Matriz"),
+    pdfMetadata(project, context, view === "cronograma" ? "Cronograma" : "Matriz", view === "cronograma" ? (scale === "trimestral" ? "Trimestral" : "Mensual") : null),
+    pdfSummary(metrics, activities, range)
+  ];
+
+  if (view === "matriz") {
+    const header = ["Código", "Actividad", "Responsable", "Inicio", "Fin", "Estado", "Avance", "Ind.", "Evid.", "Presupuesto"];
+    const body = [header.map((text) => ({ text, bold: true, color: "#FFFFFF", fillColor: "#0F4230", fontSize: 6.7, margin: [3, 4, 3, 4] }))];
+    stats.forEach((item) => {
+      body.push([
+        { text: item.activity.codigo || `A${item.index + 1}`, bold: true, color: "#FFFFFF", fillColor: item.color.hex, fontSize: 6.8, margin: [3, 4, 3, 4] },
+        { text: item.activity.nombre || "—", fontSize: 6.7, margin: [3, 4, 3, 4] },
+        { text: item.activity.responsable || "—", fontSize: 6.4, margin: [3, 4, 3, 4] },
+        { text: formatDate(item.activity.fecha_inicio), fontSize: 6.3, margin: [3, 4, 3, 4] },
+        { text: formatDate(item.activity.fecha_fin), fontSize: 6.3, margin: [3, 4, 3, 4] },
+        { text: item.status.label, fontSize: 6.3, margin: [3, 4, 3, 4] },
+        { text: formatPercent(item.progress), bold: true, color: "#0F4230", fontSize: 6.5, alignment: "right", margin: [3, 4, 3, 4] },
+        { text: String(item.indicatorCount), fontSize: 6.5, alignment: "center", margin: [3, 4, 3, 4] },
+        { text: String(item.evidenceCount), fontSize: 6.5, alignment: "center", margin: [3, 4, 3, 4] },
+        { text: formatMoney(item.programmed), fontSize: 6.2, alignment: "right", margin: [3, 4, 3, 4] }
+      ]);
+    });
+    content.push({
+      table: { headerRows: 1, widths: [35, "*", 72, 50, 50, 53, 43, 27, 27, 67], body },
+      layout: { hLineColor: () => "#DDE5E1", vLineColor: () => "#DDE5E1", fillColor: (rowIndex) => rowIndex > 0 && rowIndex % 2 === 0 ? "#F7F9F8" : null }
+    });
+    content.push({ text: "El avance técnico se calcula a partir de los indicadores. El presupuesto se presenta como información independiente.", fontSize: 6.5, color: "#66716B", italics: true, margin: [0, 8, 0, 0] });
+  } else {
+    if (!range) throw new Error("El cronograma requiere fechas del Proyecto o de las Actividades.");
+    const periods = makePeriods(range, scale);
+    const chunkSize = scale === "trimestral" ? 8 : 12;
+    const chunks = [];
+    for (let i = 0; i < periods.length; i += chunkSize) chunks.push({ startIndex: i, periods: periods.slice(i, i + chunkSize) });
+
+    chunks.forEach((chunk, chunkIndex) => {
+      if (chunkIndex > 0) content.push({ text: "", pageBreak: "before" });
+      const endIndex = chunk.startIndex + chunk.periods.length - 1;
+      content.push({ text: `${scale === "trimestral" ? "Periodos" : "Meses"} ${chunk.startIndex + 1}–${endIndex + 1}`, bold: true, color: "#0F4230", fontSize: 9, margin: [0, chunkIndex ? 0 : 2, 0, 6] });
+      const header = [
+        { text: "Actividad", bold: true, color: "#FFFFFF", fillColor: "#0F4230", fontSize: 6.8, margin: [3, 4, 3, 4] },
+        ...chunk.periods.map((period) => ({
+          text: `${period.label}\n${period.calendarLabel}${periodContainsToday(period) ? "\nHOY" : ""}`,
+          bold: true,
+          color: periodContainsToday(period) ? "#7A0E1B" : "#0F4230",
+          fillColor: periodContainsToday(period) ? "#FDECEF" : "#EEF4F1",
+          alignment: "center",
+          fontSize: 5.8,
+          margin: [1, 3, 1, 3]
+        }))
+      ];
+      const body = [header];
+      stats.forEach((item) => {
+        const scheduled = activePeriodIndices(item.activity, periods);
+        const completedCount = item.progress === null ? 0 : Math.round(scheduled.length * clamp(Number(item.progress), 0, 100) / 100);
+        const completed = new Set(scheduled.slice(0, completedCount));
+        const scheduledSet = new Set(scheduled);
+        const row = [{
+          stack: [
+            { text: `${item.activity.codigo || `A${item.index + 1}`} · ${item.activity.nombre || "—"}`, bold: true, color: "#1C2B24", fontSize: 6.4 },
+            { text: `${formatPercent(item.progress)} · ${item.status.label}`, color: "#66716B", fontSize: 5.8, margin: [0, 2, 0, 0] }
+          ],
+          border: [true, true, true, true],
+          borderColor: ["#DDE5E1", "#DDE5E1", "#DDE5E1", "#DDE5E1"],
+          margin: [3, 3, 3, 3]
+        }];
+        chunk.periods.forEach((period, localIndex) => {
+          const globalIndex = chunk.startIndex + localIndex;
+          const isPlanned = scheduledSet.has(globalIndex);
+          const isCompleted = completed.has(globalIndex);
+          row.push({
+            text: isCompleted ? "●" : isPlanned ? "•" : "",
+            color: isCompleted ? "#FFFFFF" : item.color.hex,
+            fillColor: isCompleted ? item.color.hex : isPlanned ? lightenHex(item.color.hex, 0.80) : "#FFFFFF",
+            alignment: "center",
+            fontSize: 7,
+            margin: [0, 5, 0, 5]
+          });
+        });
+        body.push(row);
+      });
+      content.push({
+        table: { headerRows: 1, widths: [190, ...chunk.periods.map(() => "*")], body },
+        layout: { hLineColor: () => "#DDE5E1", vLineColor: () => "#DDE5E1" }
+      });
+      content.push({
+        columns: [
+          { text: "● Avance técnico aproximado dentro del periodo programado", fontSize: 6.1, color: "#52615A" },
+          { text: "• Periodo programado", fontSize: 6.1, color: "#52615A" }
+        ],
+        margin: [0, 6, 0, 0]
+      });
+    });
+  }
+
+  const definition = {
+    pageSize: "LETTER",
+    pageOrientation: "landscape",
+    pageMargins: [28, 34, 28, 30],
+    info: {
+      title: `${project.nombre || "Proyecto"} - Planeador`,
+      author: "Organización Nacional Indígena de Colombia - ONIC",
+      subject: "Planeador del Proyecto",
+      creator: "ONIC Buen Gobierno"
+    },
+    footer: (currentPage, pageCount) => ({
+      columns: [
+        { text: "ONIC - Sistema de Buen Gobierno", color: "#66716B", fontSize: 6.5 },
+        { text: `Página ${currentPage} de ${pageCount}`, alignment: "right", color: "#66716B", fontSize: 6.5 }
+      ],
+      margin: [28, 0, 28, 0]
+    }),
+    defaultStyle: { font: "Roboto", color: "#26312C" },
+    content
+  };
+
+  const filename = `${safeFilename(project.codigo || project.nombre_corto || project.nombre)}_Planeador_${view === "cronograma" ? "Cronograma" : "Matriz"}.pdf`;
+  window.pdfMake.createPdf(definition).download(filename);
+  return filename;
+}
+
+function requireExcelJS() {
+  if (!window.ExcelJS || typeof window.ExcelJS.Workbook !== "function") {
+    throw new Error("El generador Excel no está disponible. Recarga la página y vuelve a intentarlo.");
+  }
+  return window.ExcelJS;
+}
+
+function excelARGB(hex) {
+  const clean = String(hex || "#FFFFFF").replace("#", "").toUpperCase();
+  return `FF${clean.padStart(6, "F").slice(-6)}`;
+}
+
+function excelFill(hex) {
+  return { type: "pattern", pattern: "solid", fgColor: { argb: excelARGB(hex) } };
+}
+
+function excelBorder() {
+  const side = { style: "thin", color: { argb: "FFDDE5E1" } };
+  return { top: side, left: side, bottom: side, right: side };
+}
+
+function excelHeader(cell, fill = "#0F4230") {
+  cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+  cell.fill = excelFill(fill);
+  cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+  cell.border = excelBorder();
+}
+
+function excelMetadataSheetHeader(ws, project, context, title, metrics, range, totalColumns = 10) {
+  const c = plannerExportContext(context);
+  ws.mergeCells(1, 1, 1, Math.max(4, totalColumns));
+  ws.getCell("A1").value = "ORGANIZACIÓN NACIONAL INDÍGENA DE COLOMBIA - ONIC";
+  ws.getCell("A1").font = { bold: true, color: { argb: "FF0F4230" }, size: 11 };
+  ws.getCell("A1").alignment = { horizontal: "left" };
+  ws.mergeCells(2, 1, 2, Math.max(4, totalColumns));
+  ws.getCell("A2").value = title;
+  ws.getCell("A2").font = { bold: true, color: { argb: "FF1C2B24" }, size: 16 };
+
+  const rows = [
+    ["Proyecto", project.nombre || "—", "Vigencia", c.vigencia],
+    ["Consejería", c.consejeria, "Programa", c.programa],
+    ["Línea de Acción", c.linea, "Periodo", `${formatDate(project.fecha_inicio)} – ${formatDate(project.fecha_fin)}`]
+  ];
+  rows.forEach((row, idx) => {
+    const excelRow = ws.getRow(4 + idx);
+    excelRow.values = [row[0], row[1], row[2], row[3]];
+    [1, 3].forEach((col) => {
+      excelRow.getCell(col).font = { bold: true, color: { argb: "FF0F4230" } };
+    });
+  });
+  ws.getRow(8).values = [
+    "Duración planificada", range ? monthDifferenceInclusive(range.start, range.end) : "—",
+    "Actividades", metrics.includedCount || 0,
+    "Actividades medibles", metrics.measurableCount || 0,
+    "Avance técnico", metrics.technicalProgress === null ? null : Number(metrics.technicalProgress) / 100
+  ];
+  for (const col of [1, 3, 5, 7]) ws.getRow(8).getCell(col).font = { bold: true, color: { argb: "FF66716B" } };
+  ws.getRow(8).getCell(8).numFmt = "0.00%";
+}
+
+async function saveExcelWorkbook(workbook, filename) {
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+async function exportPlannerExcel({ project, activities, indicators, budgetItems, evidence, metrics, view, scale, context }) {
+  const ExcelJS = requireExcelJS();
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "ONIC Buen Gobierno";
+  workbook.company = "Organización Nacional Indígena de Colombia - ONIC";
+  workbook.created = new Date();
+  workbook.modified = new Date();
+  const range = deriveTimelineRange(project, activities);
+  const stats = activityExportStats({ activities, indicators, evidence, budgetItems, metrics });
+
+  if (view === "matriz") {
+    const ws = workbook.addWorksheet("Planeador - Matriz", { views: [{ state: "frozen", ySplit: 10 }] });
+    excelMetadataSheetHeader(ws, project, context, "PLANEADOR DEL PROYECTO - MATRIZ", metrics, range, 11);
+    const headerRow = 10;
+    const headers = ["Código", "Actividad", "Responsable", "Inicio", "Fin", "Estado", "Avance técnico", "Indicadores", "Evidencias", "Presupuesto programado", "Color"];
+    ws.getRow(headerRow).values = headers;
+    ws.getRow(headerRow).eachCell((cell) => excelHeader(cell));
+    stats.forEach((item, idx) => {
+      const row = ws.getRow(headerRow + 1 + idx);
+      row.values = [
+        item.activity.codigo || `A${item.index + 1}`,
+        item.activity.nombre || "—",
+        item.activity.responsable || "—",
+        item.activity.fecha_inicio ? parseDate(item.activity.fecha_inicio) : null,
+        item.activity.fecha_fin ? parseDate(item.activity.fecha_fin) : null,
+        item.status.label,
+        item.progress === null ? null : Number(item.progress) / 100,
+        item.indicatorCount,
+        item.evidenceCount,
+        item.programmed,
+        colorLabel(item.activity)
+      ];
+      row.getCell(1).fill = excelFill(item.color.hex);
+      row.getCell(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+      row.getCell(4).numFmt = "dd/mm/yyyy";
+      row.getCell(5).numFmt = "dd/mm/yyyy";
+      row.getCell(7).numFmt = "0.00%";
+      row.getCell(10).numFmt = '[$$-es-CO]#,##0';
+      row.eachCell((cell) => { cell.border = excelBorder(); cell.alignment = { vertical: "top", wrapText: true }; });
+    });
+    ws.columns = [
+      { width: 12 }, { width: 38 }, { width: 24 }, { width: 13 }, { width: 13 }, { width: 16 }, { width: 15 }, { width: 12 }, { width: 11 }, { width: 22 }, { width: 14 }
+    ];
+    ws.autoFilter = { from: { row: headerRow, column: 1 }, to: { row: headerRow + stats.length, column: headers.length } };
+    ws.pageSetup = { orientation: "landscape", paperSize: 1, fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.3, right: 0.3, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 } };
+    const noteRow = headerRow + stats.length + 2;
+    ws.mergeCells(noteRow, 1, noteRow, headers.length);
+    ws.getCell(noteRow, 1).value = "El avance técnico se calcula desde los indicadores; el presupuesto se presenta como información independiente.";
+    ws.getCell(noteRow, 1).font = { italic: true, color: { argb: "FF66716B" }, size: 9 };
+  } else {
+    if (!range) throw new Error("El cronograma requiere fechas del Proyecto o de las Actividades.");
+    const periods = makePeriods(range, scale);
+    const ws = workbook.addWorksheet("Planeador - Cronograma", { views: [{ state: "frozen", xSplit: 6, ySplit: 10 }] });
+    excelMetadataSheetHeader(ws, project, context, `PLANEADOR DEL PROYECTO - CRONOGRAMA ${scale === "trimestral" ? "TRIMESTRAL" : "MENSUAL"}`, metrics, range, 6 + periods.length);
+    const headerRow = 10;
+    const baseHeaders = ["Código", "Actividad", "Responsable", "Inicio", "Fin", "Avance"];
+    ws.getRow(headerRow).values = [...baseHeaders, ...periods.map((period) => `${period.label}\n${period.calendarLabel}${periodContainsToday(period) ? "\nHOY" : ""}`)];
+    ws.getRow(headerRow).eachCell((cell, col) => excelHeader(cell, col > baseHeaders.length && periodContainsToday(periods[col - baseHeaders.length - 1]) ? "#A30C22" : "#0F4230"));
+    stats.forEach((item, idx) => {
+      const row = ws.getRow(headerRow + 1 + idx);
+      row.values = [
+        item.activity.codigo || `A${item.index + 1}`,
+        item.activity.nombre || "—",
+        item.activity.responsable || "—",
+        item.activity.fecha_inicio ? parseDate(item.activity.fecha_inicio) : null,
+        item.activity.fecha_fin ? parseDate(item.activity.fecha_fin) : null,
+        item.progress === null ? null : Number(item.progress) / 100
+      ];
+      row.getCell(1).fill = excelFill(item.color.hex);
+      row.getCell(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+      row.getCell(4).numFmt = "dd/mm/yyyy";
+      row.getCell(5).numFmt = "dd/mm/yyyy";
+      row.getCell(6).numFmt = "0.00%";
+      const scheduled = activePeriodIndices(item.activity, periods);
+      const completedCount = item.progress === null ? 0 : Math.round(scheduled.length * clamp(Number(item.progress), 0, 100) / 100);
+      const completed = new Set(scheduled.slice(0, completedCount));
+      const scheduledSet = new Set(scheduled);
+      periods.forEach((period, pIndex) => {
+        const cell = row.getCell(baseHeaders.length + 1 + pIndex);
+        if (scheduledSet.has(pIndex)) {
+          cell.fill = excelFill(completed.has(pIndex) ? item.color.hex : lightenHex(item.color.hex, 0.80));
+          cell.value = completed.has(pIndex) ? "●" : "•";
+          cell.font = { bold: true, color: { argb: completed.has(pIndex) ? "FFFFFFFF" : excelARGB(item.color.hex) } };
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+        }
+        cell.border = excelBorder();
+      });
+      for (let col = 1; col <= baseHeaders.length; col += 1) {
+        row.getCell(col).border = excelBorder();
+        row.getCell(col).alignment = { vertical: "top", wrapText: true };
+      }
+    });
+    ws.getColumn(1).width = 12;
+    ws.getColumn(2).width = 36;
+    ws.getColumn(3).width = 24;
+    ws.getColumn(4).width = 13;
+    ws.getColumn(5).width = 13;
+    ws.getColumn(6).width = 12;
+    periods.forEach((period, idx) => { ws.getColumn(baseHeaders.length + 1 + idx).width = scale === "trimestral" ? 13 : 9; });
+    ws.pageSetup = { orientation: "landscape", paperSize: 1, fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.25, right: 0.25, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 } };
+    const legendRow = headerRow + stats.length + 2;
+    ws.getCell(legendRow, 1).value = "Leyenda";
+    ws.getCell(legendRow, 1).font = { bold: true, color: { argb: "FF0F4230" } };
+    ws.getCell(legendRow + 1, 1).value = "●";
+    ws.getCell(legendRow + 1, 2).value = "Avance técnico aproximado dentro del periodo programado";
+    ws.getCell(legendRow + 2, 1).value = "•";
+    ws.getCell(legendRow + 2, 2).value = "Periodo programado";
+  }
+
+  const filename = `${safeFilename(project.codigo || project.nombre_corto || project.nombre)}_Planeador_${view === "cronograma" ? "Cronograma" : "Matriz"}.xlsx`;
+  await saveExcelWorkbook(workbook, filename);
+  return filename;
+}
+
+export async function exportProjectPlanner(options) {
+  const format = String(options?.format || "").toLowerCase();
+  if (format === "pdf") return exportPlannerPdf(options);
+  if (format === "excel" || format === "xlsx") return exportPlannerExcel(options);
+  throw new Error("Selecciona un formato de exportación válido.");
+}
+
 export function plannerColorOptions() {
   return [...COLOR_OPTIONS];
 }
@@ -317,7 +794,8 @@ export function renderProjectPlanner({
   onEditActivity,
   onNewActivity,
   onAuditActivity,
-  onChangeColor
+  onChangeColor,
+  onExport
 }) {
   const range = deriveTimelineRange(project, activities);
   const body = container;
@@ -338,6 +816,10 @@ export function renderProjectPlanner({
           <button class="${scale === "mensual" ? "active" : ""}" data-planner-scale="mensual" type="button">Mensual</button>
           <button class="${scale === "trimestral" ? "active" : ""}" data-planner-scale="trimestral" type="button">Trimestral</button>
         </div>
+        <div class="planner-export-actions" role="group" aria-label="Exportar Planeador">
+          <button class="btn btn-secondary planner-export-button" data-planner-export="pdf" type="button" title="Exportar la vista actual del Planeador en PDF">PDF</button>
+          <button class="btn btn-secondary planner-export-button" data-planner-export="excel" type="button" title="Exportar la vista actual del Planeador en Excel">Excel</button>
+        </div>
       </div>
       <div class="planner-guidance"><strong>Cómo leer el Planeador</strong><p>La extensión de cada barra representa el tiempo programado de la Actividad. El relleno interior muestra su avance técnico calculado desde los indicadores. El color es únicamente una ayuda visual y no modifica estados, ponderaciones ni porcentajes.</p></div>
       <div id="plannerContent">
@@ -350,6 +832,18 @@ export function renderProjectPlanner({
   body.querySelector("#plannerNewActivity")?.addEventListener("click", () => onNewActivity?.());
   body.querySelectorAll("[data-planner-view]").forEach((button) => button.addEventListener("click", () => onViewChange?.(button.dataset.plannerView)));
   body.querySelectorAll("[data-planner-scale]").forEach((button) => button.addEventListener("click", () => onScaleChange?.(button.dataset.plannerScale)));
+  body.querySelectorAll("[data-planner-export]").forEach((button) => button.addEventListener("click", async () => {
+    const buttons = [...body.querySelectorAll("[data-planner-export]")];
+    const original = button.textContent;
+    buttons.forEach((item) => { item.disabled = true; });
+    button.textContent = "Generando…";
+    try {
+      await onExport?.({ format: button.dataset.plannerExport, view, scale });
+    } finally {
+      buttons.forEach((item) => { item.disabled = false; });
+      button.textContent = original;
+    }
+  }));
   body.querySelectorAll("[data-open-tab]").forEach((button) => button.addEventListener("click", () => onOpenActivity?.(button.dataset.id, button.dataset.openTab)));
   body.querySelectorAll(".planner-open-activity,.planner-timeline-open").forEach((button) => button.addEventListener("click", () => onOpenActivity?.(button.dataset.id, "general")));
   body.querySelectorAll(".planner-edit-activity").forEach((button) => button.addEventListener("click", () => {

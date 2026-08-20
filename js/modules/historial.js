@@ -24,6 +24,7 @@ const ACTION_LABELS = {
   importar_vigencia: "Importó Vigencia",
   restaurar_vigencia: "Restauró Vigencia",
   exportar_historial: "Exportó historial",
+  exportar_planeador: "Exportó Planeador",
   generar_documento: "Generó documento"
 };
 

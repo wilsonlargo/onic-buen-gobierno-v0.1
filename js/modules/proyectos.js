@@ -1,7 +1,7 @@
 import { requireSupabase } from "../supabaseClient.js";
 import { updateWithVersion } from "../security.js";
 import { openModal, closeModal } from "../components/modal.js";
-import { renderProyectoWorkspace } from "./proyectoWorkspace.js?v=0.12.0";
+import { renderProyectoWorkspace } from "./proyectoWorkspace.js?v=0.12.1";
 import { setAuditContext, openAuditPanel } from "./auditoria.js";
 
 function escapeHTML(value = "") {

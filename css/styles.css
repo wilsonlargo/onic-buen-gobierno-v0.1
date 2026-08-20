@@ -6256,7 +6256,7 @@ textarea {
 }
 
 /* =========================================================
-   PLANEADOR DEL PROYECTO · v0.12.0
+   PLANEADOR DEL PROYECTO · v0.12.1
    ========================================================= */
 .planner-section {
   display: grid;
@@ -6915,5 +6915,31 @@ textarea {
 
   .planner-color-grid {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Planeador v0.12.1 - exportación PDF / Excel */
+.planner-export-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.planner-export-button {
+  min-width: 86px;
+}
+
+@media (max-width: 760px) {
+  .planner-export-actions {
+    width: 100%;
+    margin-left: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .planner-export-button {
+    width: 100%;
+    min-width: 0;
   }
 }

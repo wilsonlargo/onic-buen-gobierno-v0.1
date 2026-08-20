@@ -1,9 +1,9 @@
 import { requireSupabase } from "../supabaseClient.js";
-import { updateWithVersion } from "../security.js";
+import { updateWithVersion, logManualEvent } from "../security.js";
 import { openModal, closeModal } from "../components/modal.js";
 import { setAuditContext, openAuditPanel } from "./auditoria.js";
 import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js";
-import { renderProjectPlanner, plannerColorOptions } from "./projectPlanner.js?v=0.12.0";
+import { renderProjectPlanner, plannerColorOptions, exportProjectPlanner } from "./projectPlanner.js?v=0.12.1";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -1137,7 +1137,45 @@ export async function renderProyectoWorkspace(container, options) {
         });
       },
       onAuditActivity: openPlannerActivityAudit,
-      onChangeColor: openPlannerColorDialog
+      onChangeColor: openPlannerColorDialog,
+      onExport: async ({ format, view, scale }) => {
+        try {
+          await exportProjectPlanner({
+            format,
+            view,
+            scale,
+            project,
+            activities,
+            indicators,
+            budgetItems,
+            evidence,
+            metrics,
+            context: {
+              vigenciaNombre: vigencia.nombre,
+              consejeriaNombre: vigenciaConsejeria.consejerias.nombre_largo || vigenciaConsejeria.consejerias.nombre_corto,
+              lineaNombre: linea.nombre,
+              programaNombre: programa.nombre
+            }
+          });
+          await logManualEvent({
+            action: "exportar_planeador",
+            entityType: "proyecto",
+            entityId: project.id,
+            entityName: project.nombre,
+            vigenciaId: vigencia.id,
+            vigenciaConsejeriaId: vigenciaConsejeria.id,
+            detail: {
+              formato: format === "pdf" ? "PDF" : "Excel",
+              vista: view === "cronograma" ? "Cronograma" : "Matriz",
+              escala: view === "cronograma" ? (scale === "trimestral" ? "Trimestral" : "Mensual") : null
+            }
+          });
+          showToast(`Planeador exportado en ${format === "pdf" ? "PDF" : "Excel"}.`);
+        } catch (error) {
+          console.error(error);
+          showToast(error.message || "No fue posible exportar el Planeador.");
+        }
+      }
     });
   }
 
