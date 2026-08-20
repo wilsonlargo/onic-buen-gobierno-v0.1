@@ -3,6 +3,7 @@ import { renderInicio } from "./modules/inicio.js?v=0.14.0";
 import { renderVigencias } from "./modules/vigencias.js?v=0.14.0";
 import { renderConsejerias } from "./modules/consejerias.js";
 import { renderMandatos } from "./modules/mandatos.js";
+import { renderSeguimientoMandatos } from "./modules/seguimientoMandatos.js?v=0.15.0";
 import { renderLineas } from "./modules/lineas.js";
 import { renderProgramas } from "./modules/programas.js";
 import { renderProyectos } from "./modules/proyectos.js?v=0.13.0";
@@ -44,6 +45,7 @@ const views = {
   inicio: { title: "Inicio", render: renderInicio },
   vigencias: { title: "Vigencias", render: renderVigencias },
   mandatos: { title: "Mandatos", render: renderMandatos },
+  seguimiento_mandatos: { title: "Seguimiento de Mandatos", render: renderSeguimientoMandatos },
   consejerias: { title: "Consejerías", render: renderConsejerias },
   lineas: { title: "Líneas de Acción", render: renderLineas },
   programas: { title: "Programas", render: renderProgramas },
