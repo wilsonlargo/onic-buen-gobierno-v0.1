@@ -4,6 +4,9 @@ import { renderVigencias } from "./modules/vigencias.js?v=0.14.0";
 import { renderConsejerias } from "./modules/consejerias.js";
 import { renderMandatos } from "./modules/mandatos.js";
 import { renderSeguimientoMandatos } from "./modules/seguimientoMandatos.js?v=0.15.0";
+import { renderMiTrabajo } from "./modules/miTrabajo.js?v=0.16.0";
+import { renderControlCalidad } from "./modules/controlCalidad.js?v=0.16.0";
+import { initGlobalSearch } from "./modules/buscadorGlobal.js?v=0.16.0";
 import { renderLineas } from "./modules/lineas.js";
 import { renderProgramas } from "./modules/programas.js";
 import { renderProyectos } from "./modules/proyectos.js?v=0.13.0";
@@ -43,6 +46,7 @@ let currentViewName = "inicio";
 
 const views = {
   inicio: { title: "Inicio", render: renderInicio },
+  mi_trabajo: { title: "Mi trabajo", render: renderMiTrabajo },
   vigencias: { title: "Vigencias", render: renderVigencias },
   mandatos: { title: "Mandatos", render: renderMandatos },
   seguimiento_mandatos: { title: "Seguimiento de Mandatos", render: renderSeguimientoMandatos },
@@ -53,6 +57,7 @@ const views = {
   ponderaciones: { title: "Ponderaciones", render: renderPonderaciones },
   cortes: { title: "Cortes de seguimiento", render: renderCortesSeguimiento },
   alertas: { title: "Alertas y tareas", render: (container, target) => renderAlertasTareas(container, target, { onNavigate: navigate }) },
+  calidad: { title: "Control de calidad", render: renderControlCalidad },
   historial: { title: "Historial", render: renderHistorial },
   usuarios: { title: "Usuarios", render: renderUsuarios }
 };
@@ -113,6 +118,12 @@ async function showApp(session, { registerLogin = false } = {}) {
     startPermissionObserver(mainContent, () => currentViewName);
 
     initAuditoria({
+      onNavigate: async (target) => {
+        await navigate(target.view || "inicio", target);
+      }
+    });
+
+    initGlobalSearch({
       onNavigate: async (target) => {
         await navigate(target.view || "inicio", target);
       }

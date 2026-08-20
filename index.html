@@ -11,7 +11,7 @@
   <link rel="icon" href="./assets/branding/onic-logo.png" type="image/png">
   <link rel="apple-touch-icon" href="./assets/branding/onic-logo.png">
   <link rel="stylesheet" href="./css/variables.css?v=0.13.0">
-  <link rel="stylesheet" href="./css/styles.css?v=0.15.0">
+  <link rel="stylesheet" href="./css/styles.css?v=0.16.0">
 </head>
 <body>
 
@@ -62,6 +62,11 @@
         <button class="nav-item active" data-view="inicio">
           <span class="nav-icon">⌂</span>
           <span>Inicio</span>
+        </button>
+
+        <button class="nav-item" data-view="mi_trabajo">
+          <span class="nav-icon">✓</span>
+          <span>Mi trabajo</span>
         </button>
 
         <button class="nav-item" data-view="vigencias">
@@ -115,6 +120,11 @@
           <span id="alertsNavBadge" class="nav-count-badge hidden">0</span>
         </button>
 
+        <button class="nav-item" data-view="calidad">
+          <span class="nav-icon">✓</span>
+          <span>Control de calidad</span>
+        </button>
+
         <button class="nav-item security-hidden" data-view="historial">
           <span class="nav-icon">◷</span>
           <span>Historial</span>
@@ -157,6 +167,12 @@
         </div>
 
         <div class="user-area">
+          <button id="globalSearchButton" class="global-search-button" type="button" title="Buscar en el Sistema (Ctrl+K)" aria-label="Buscar en el Sistema">
+            <span class="global-search-button-icon" aria-hidden="true">⌕</span>
+            <span class="global-search-button-text">Buscar</span>
+            <kbd>Ctrl K</kbd>
+          </button>
+
           <button
             id="auditToggleButton"
             class="audit-toggle-button"
@@ -253,6 +269,6 @@
 
   <script src="./js/config.js"></script>
 
-  <script type="module" src="./js/app.js?v=0.15.0"></script>
+  <script type="module" src="./js/app.js?v=0.16.0"></script>
 </body>
 </html>
