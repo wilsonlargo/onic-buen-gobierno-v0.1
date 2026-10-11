@@ -1,12 +1,13 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { updateWithVersion } from "../security.js";
-import { openModal, closeModal } from "../components/modal.js";
-import { renderConsejeriaWorkspace } from "./consejeriaWorkspace.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { updateWithVersion } from "../security.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { renderConsejeriaWorkspace } from "./consejeriaWorkspace.js?v=5.2.0";
 import {
   getConsejeriaProgressMap,
   formatConsejeriaProgress,
   getConsejeriaProgressState
-} from "./consejeriaProgress.js";
+} from "./consejeriaProgress.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -379,7 +380,7 @@ function openConsejeriaForm({ record = null, onSaved }) {
       await onSaved();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible guardar la consejería.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible guardar la consejería.");
     } finally {
       submit.disabled = false;
       submit.textContent = editing ? "Guardar cambios" : "Crear consejería";
@@ -451,7 +452,7 @@ async function openDeleteConsejeriaDialog({ record, onDeleted, onInactivated }) 
           await onInactivated();
         } catch (error) {
           console.error(error);
-          message.textContent = error.message || "No fue posible inactivar la consejería.";
+          message.textContent = friendlyErrorMessage(error, "No fue posible inactivar la consejería.");
           inactivate.disabled = false;
           inactivate.textContent = "Inactivar consejería";
         }
@@ -524,7 +525,7 @@ async function openDeleteConsejeriaDialog({ record, onDeleted, onInactivated }) 
       await onDeleted();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible eliminar la consejería.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible eliminar la consejería.");
       confirm.disabled = false;
       confirm.textContent = "Eliminar definitivamente";
     }
@@ -666,7 +667,7 @@ function openLinkForm({ vigencia, catalogo, vinculadas, onSaved }) {
       await onSaved();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible vincular la consejería.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible vincular la consejería.");
     } finally {
       submit.disabled = false;
       submit.textContent = "Vincular";
@@ -787,7 +788,7 @@ function openEditLinkForm({ record, onSaved }) {
       await onSaved();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible actualizar la vinculación.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible actualizar la vinculación.");
     } finally {
       submit.disabled = false;
       submit.textContent = "Guardar cambios";
@@ -827,7 +828,7 @@ function openRetireDialog({ record, onSaved }) {
         await onSaved();
       } catch (error) {
         console.error(error);
-        message.textContent = error.message || "No fue posible reactivar la consejería.";
+        message.textContent = friendlyErrorMessage(error, "No fue posible reactivar la consejería.");
         button.disabled = false;
         button.textContent = "Reactivar";
       }
@@ -871,7 +872,7 @@ function openRetireDialog({ record, onSaved }) {
       await onSaved();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible retirar la consejería.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible retirar la consejería.");
       button.disabled = false;
       button.textContent = "Retirar / Inactivar";
     }
@@ -1310,7 +1311,7 @@ export async function renderConsejerias(container, navigationTarget = null) {
       linkedContainer.innerHTML = `
         <div class="empty-state">
           <strong>No se pudo cargar la vinculación de consejerías.</strong>
-          <p>${escapeHTML(error.message || "Error inesperado")}</p>
+          <p>${escapeHTML(friendlyErrorMessage(error, "Error inesperado"))}</p>
         </div>
       `;
     }
@@ -1369,7 +1370,7 @@ export async function renderConsejerias(container, navigationTarget = null) {
       <section class="panel" style="margin-top: 0">
         <p class="eyebrow">Error</p>
         <h2>No fue posible cargar Consejerías</h2>
-        <p class="muted">${escapeHTML(error.message || "No fue posible cargar las Consejerías. Intenta nuevamente.")}</p>
+        <p class="muted">${escapeHTML(friendlyErrorMessage(error, "No fue posible cargar las Consejerías. Intenta nuevamente."))}</p>
       </section>
     `;
   }

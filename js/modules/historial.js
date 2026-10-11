@@ -1,6 +1,7 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { openModal, closeModal } from "../components/modal.js";
-import { logManualEvent } from "../security.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { logManualEvent } from "../security.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -480,7 +481,7 @@ export async function renderHistorial(container) {
       renderRows();
     } catch (error) {
       console.error(error);
-      content.innerHTML = `<div class="empty-state"><strong>No fue posible cargar el historial.</strong><p>${escapeHTML(error.message || "Intenta nuevamente.")}</p></div>`;
+      content.innerHTML = `<div class="empty-state"><strong>No fue posible cargar el historial.</strong><p>${escapeHTML(friendlyErrorMessage(error, "Intenta nuevamente."))}</p></div>`;
     }
   }
 
@@ -583,6 +584,6 @@ export async function renderHistorial(container) {
     await refresh();
   } catch (error) {
     console.error(error);
-    content.innerHTML = `<div class="empty-state"><strong>No fue posible iniciar el Historial.</strong><p>${escapeHTML(error.message || "Intenta nuevamente.")}</p></div>`;
+    content.innerHTML = `<div class="empty-state"><strong>No fue posible iniciar el Historial.</strong><p>${escapeHTML(friendlyErrorMessage(error, "Intenta nuevamente."))}</p></div>`;
   }
 }

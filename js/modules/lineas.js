@@ -1,7 +1,8 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { updateWithVersion } from "../security.js";
-import { openModal, closeModal } from "../components/modal.js";
-import { setAuditContext, openAuditPanel } from "./auditoria.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { updateWithVersion } from "../security.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -362,7 +363,7 @@ function openLineaForm({
     } catch (error) {
       console.error(error);
       message.textContent =
-        error.message || "No fue posible guardar la Línea de Acción.";
+        friendlyErrorMessage(error, "No fue posible guardar la Línea de Acción.");
       submit.disabled = false;
       submit.textContent = editing
         ? "Guardar cambios"
@@ -460,7 +461,7 @@ async function openDeleteLineaDialog({ record, onChanged }) {
       } catch (error) {
         console.error(error);
         message.textContent =
-          error.message || "No fue posible actualizar el estado.";
+          friendlyErrorMessage(error, "No fue posible actualizar el estado.");
         button.disabled = false;
         button.textContent = label;
       }
@@ -553,7 +554,7 @@ async function openDeleteLineaDialog({ record, onChanged }) {
     } catch (error) {
       console.error(error);
       message.textContent =
-        error.message || "No fue posible eliminar la Línea de Acción.";
+        friendlyErrorMessage(error, "No fue posible eliminar la Línea de Acción.");
       confirm.disabled = false;
       confirm.textContent = "Eliminar definitivamente";
     }
@@ -1011,7 +1012,7 @@ function openImportLineas({
       } catch (error) {
         console.error(error);
         message.textContent =
-          error.message || "No fue posible leer el archivo.";
+          friendlyErrorMessage(error, "No fue posible leer el archivo.");
       }
     });
 
@@ -1048,7 +1049,7 @@ function openImportLineas({
     } catch (error) {
       console.error(error);
       message.textContent =
-        error.message || "No fue posible completar la importación.";
+        friendlyErrorMessage(error, "No fue posible completar la importación.");
       confirm.disabled = false;
       confirm.textContent = "Importar registros válidos";
     }
@@ -1651,7 +1652,7 @@ export async function renderLineas(container, navigationTarget = null) {
       );
     } catch (error) {
       console.error(error);
-      showToast(error.message || "No fue posible copiar las Líneas.");
+      showToast(friendlyErrorMessage(error, "No fue posible copiar las Líneas."));
     }
   });
 
@@ -1663,7 +1664,7 @@ export async function renderLineas(container, navigationTarget = null) {
     content.innerHTML = `
       <div class="empty-state">
         <strong>No fue posible cargar Líneas de Acción.</strong>
-        <p>${escapeHTML(error.message || "No fue posible cargar las Líneas de Acción. Intenta nuevamente.")}</p>
+        <p>${escapeHTML(friendlyErrorMessage(error, "No fue posible cargar las Líneas de Acción. Intenta nuevamente."))}</p>
       </div>
     `;
   }

@@ -1,6 +1,7 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { logManualEvent } from "../security.js";
-import { openModal, closeModal } from "../components/modal.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { logManualEvent } from "../security.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 const LOGO_PATH = "./assets/branding/onic-logo.png";
 
@@ -4093,8 +4094,7 @@ export async function openDocumentReportDialog({
 
           <p>
             ${escapeHTML(
-              error.message ||
-              "No fue posible consolidar la información."
+              friendlyErrorMessage(error, "No fue posible consolidar la información.")
             )}
           </p>
         </div>
@@ -4342,8 +4342,7 @@ export async function openDocumentReportDialog({
         console.error(error);
 
         message.textContent =
-          error.message ||
-          "No fue posible generar el PDF.";
+          friendlyErrorMessage(error, "No fue posible generar el PDF.");
       } finally {
         pdfButton.disabled = false;
         wordButton.disabled = false;
@@ -4383,8 +4382,7 @@ export async function openDocumentReportDialog({
         console.error(error);
 
         message.textContent =
-          error.message ||
-          "No fue posible generar el documento Word.";
+          friendlyErrorMessage(error, "No fue posible generar el documento Word.");
       } finally {
         pdfButton.disabled = false;
         wordButton.disabled = false;

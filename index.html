@@ -10,8 +10,8 @@
 
   <link rel="icon" href="./assets/branding/onic-logo.png" type="image/png">
   <link rel="apple-touch-icon" href="./assets/branding/onic-logo.png">
-  <link rel="stylesheet" href="./css/variables.css?v=0.13.0">
-  <link rel="stylesheet" href="./css/styles.css?v=0.16.0">
+  <link rel="stylesheet" href="./css/variables.css?v=5.2.0">
+  <link rel="stylesheet" href="./css/styles.css?v=5.2.0">
 </head>
 <body>
 
@@ -59,81 +59,82 @@
       </div>
 
       <nav id="mainNav" class="nav-list" aria-label="Navegación principal">
-        <button class="nav-item active" data-view="inicio">
-          <span class="nav-icon">⌂</span>
-          <span>Inicio</span>
-        </button>
+        <div class="nav-group" data-nav-group="personal">
+          <p class="nav-section-label">General</p>
+          <button class="nav-item active" data-view="inicio">
+            <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"></path><path d="M5.5 10.5V20h13v-9.5"></path><path d="M9.5 20v-6h5v6"></path></svg></span>
+            <span>Inicio</span>
+          </button>
+          <button class="nav-item" data-view="mi_trabajo">
+            <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l2 2 4-4"></path><path d="M5 4h14v16H5z"></path><path d="M8 4V2h8v2"></path></svg></span>
+            <span>Mi trabajo</span>
+          </button>
+        </div>
 
-        <button class="nav-item" data-view="mi_trabajo">
-          <span class="nav-icon">✓</span>
-          <span>Mi trabajo</span>
-        </button>
+        <div class="nav-group" data-nav-group="planeacion">
+          <p class="nav-section-label">Planeación</p>
+          <button class="nav-item" data-view="vigencias">
+            <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v3M19 3v3"></path><path d="M4 7h16v13H4z"></path><path d="M4 10h16"></path></svg></span>
+            <span>Vigencias</span>
+          </button>
+          <button class="nav-item" data-view="mandatos">
+            <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10l3 3v15H4V3z"></path><path d="M8 8h8M8 12h8M8 16h5"></path></svg></span>
+            <span>Mandatos</span>
+          </button>
+          <button class="nav-item" data-view="consejerias">
+            <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 20v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span>
+            <span>Consejerías</span>
+          </button>
+          <button class="nav-item" data-view="lineas">
+            <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5z"></path><path d="m3 12 9 5 9-5"></path><path d="m3 17 9 5 9-5"></path></svg></span>
+            <span>Líneas de Acción</span>
+          </button>
+          <button class="nav-item" data-view="programas">
+            <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M7 8h10M7 12h10M7 16h6"></path></svg></span>
+            <span>Programas</span>
+          </button>
+          <button class="nav-item" data-view="proyectos">
+            <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h6l2 2h8v12H4z"></path><path d="M8 11h8M8 15h5"></path></svg></span>
+            <span>Proyectos</span>
+          </button>
+          <button class="nav-item" data-view="ponderaciones">
+            <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 5 5 19"></path><circle cx="7" cy="7" r="2"></circle><circle cx="17" cy="17" r="2"></circle></svg></span>
+            <span>Ponderaciones</span>
+          </button>
+        </div>
 
-        <button class="nav-item" data-view="vigencias">
-          <span class="nav-icon">◫</span>
-          <span>Vigencias</span>
-        </button>
+        <div class="nav-group" data-nav-group="seguimiento">
+          <p class="nav-section-label">Seguimiento</p>
+          <button class="nav-item" data-view="seguimiento_mandatos">
+            <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17l5-5 4 4 7-8"></path><path d="M15 8h5v5"></path></svg></span>
+            <span>Seguimiento de Mandatos</span>
+          </button>
+          <button class="nav-item" data-view="cortes">
+            <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 3v9l6 3"></path></svg></span>
+            <span>Cortes</span>
+          </button>
+          <button class="nav-item" data-view="alertas">
+            <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg></span>
+            <span>Alertas y tareas</span>
+            <span id="alertsNavBadge" class="nav-count-badge hidden">0</span>
+          </button>
+          <button class="nav-item" data-view="calidad">
+            <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 7 3v5c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6l7-3z"></path><path d="m9 12 2 2 4-4"></path></svg></span>
+            <span>Control de calidad</span>
+          </button>
+        </div>
 
-        <button class="nav-item" data-view="mandatos">
-          <span class="nav-icon">◆</span>
-          <span>Mandatos</span>
-        </button>
-
-        <button class="nav-item" data-view="seguimiento_mandatos">
-          <span class="nav-icon">↗</span>
-          <span>Seguimiento de Mandatos</span>
-        </button>
-
-        <button class="nav-item" data-view="consejerias">
-          <span class="nav-icon">◎</span>
-          <span>Consejerías</span>
-        </button>
-
-        <button class="nav-item" data-view="lineas">
-          <span class="nav-icon">≡</span>
-          <span>Líneas de Acción</span>
-        </button>
-
-        <button class="nav-item" data-view="programas">
-          <span class="nav-icon">▤</span>
-          <span>Programas</span>
-        </button>
-
-        <button class="nav-item" data-view="proyectos">
-          <span class="nav-icon">▣</span>
-          <span>Proyectos</span>
-        </button>
-
-        <button class="nav-item" data-view="ponderaciones">
-          <span class="nav-icon">%</span>
-          <span>Ponderaciones</span>
-        </button>
-
-        <button class="nav-item" data-view="cortes">
-          <span class="nav-icon">◔</span>
-          <span>Cortes</span>
-        </button>
-
-        <button class="nav-item" data-view="alertas">
-          <span class="nav-icon">!</span>
-          <span>Alertas y tareas</span>
-          <span id="alertsNavBadge" class="nav-count-badge hidden">0</span>
-        </button>
-
-        <button class="nav-item" data-view="calidad">
-          <span class="nav-icon">✓</span>
-          <span>Control de calidad</span>
-        </button>
-
-        <button class="nav-item security-hidden" data-view="historial">
-          <span class="nav-icon">◷</span>
-          <span>Historial</span>
-        </button>
-
-        <button class="nav-item security-hidden" data-view="usuarios">
-          <span class="nav-icon">♙</span>
-          <span>Usuarios</span>
-        </button>
+        <div class="nav-group nav-group-admin" data-nav-group="administracion">
+          <p class="nav-section-label">Administración</p>
+          <button class="nav-item security-hidden" data-view="historial">
+            <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path><path d="M12 7v5l3 2"></path></svg></span>
+            <span>Historial</span>
+          </button>
+          <button class="nav-item security-hidden" data-view="usuarios">
+            <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 20v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span>
+            <span>Usuarios</span>
+          </button>
+        </div>
       </nav>
 
     </aside>
@@ -168,7 +169,7 @@
 
         <div class="user-area">
           <button id="globalSearchButton" class="global-search-button" type="button" title="Buscar en el Sistema (Ctrl+K)" aria-label="Buscar en el Sistema">
-            <span class="global-search-button-icon" aria-hidden="true">⌕</span>
+            <span class="global-search-button-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg></span>
             <span class="global-search-button-text">Buscar</span>
             <kbd>Ctrl K</kbd>
           </button>
@@ -267,8 +268,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
 
-  <script src="./js/config.js"></script>
+  <script src="./js/config.js?v=5.2.0"></script>
 
-  <script type="module" src="./js/app.js?v=0.16.0"></script>
+  <script type="module" src="./js/app.js?v=5.2.0"></script>
 </body>
 </html>

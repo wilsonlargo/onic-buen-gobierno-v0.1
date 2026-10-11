@@ -1,6 +1,7 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { logManualEvent } from "../security.js";
-import { openModal, closeModal } from "../components/modal.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { logManualEvent } from "../security.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -211,8 +212,7 @@ export function openVigenciaBackupDialog({
       console.error(error);
 
       message.textContent =
-        error.message ||
-        "No fue posible generar la copia de seguridad.";
+        friendlyErrorMessage(error, "No fue posible generar la copia de seguridad.");
 
       generate.disabled = false;
       generate.textContent =

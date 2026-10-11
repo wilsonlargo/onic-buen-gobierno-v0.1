@@ -1,4 +1,4 @@
-import { requireSupabase } from "./supabaseClient.js";
+import { requireSupabase } from "./supabaseClient.js?v=5.2.0";
 
 let currentProfile = null;
 let currentAssignments = [];
@@ -221,7 +221,7 @@ function mutationText(button) {
 }
 
 function applyReadOnly(root) {
-  const mutationPattern = /(^\+|guardar|crear|editar|eliminar|retirar|vincular|archivar|reactivar|registrar avance|nuevo seguimiento|nueva nota|aprobar|restablecer|ponderación sugerida|completar restante|importar vigencia|importar$|borrar|inactivar|marcar como cancelada)/i;
+  const mutationPattern = /(^\+|\bnuevo\b|\bnueva\b|guardar|crear|editar|eliminar|retirar|vincular|archivar|reactivar|registrar avance|aprobar|restablecer|ponderación sugerida|completar restante|importar vigencia|importar$|borrar|inactivar|marcar como cancelada)/i;
 
   root.querySelectorAll("button").forEach((button) => {
     const text = mutationText(button);

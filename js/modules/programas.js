@@ -1,6 +1,7 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { updateWithVersion } from "../security.js";
-import { openModal, closeModal } from "../components/modal.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { updateWithVersion } from "../security.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -406,7 +407,7 @@ function openProgramaForm({
     } catch (error) {
       console.error(error);
       message.textContent =
-        error.message || "No fue posible guardar el Programa.";
+        friendlyErrorMessage(error, "No fue posible guardar el Programa.");
 
       submit.disabled = false;
       submit.textContent = editing
@@ -506,7 +507,7 @@ async function openDeleteProgramaDialog({ record, onChanged }) {
         console.error(error);
 
         message.textContent =
-          error.message || "No fue posible actualizar el estado.";
+          friendlyErrorMessage(error, "No fue posible actualizar el estado.");
 
         button.disabled = false;
         button.textContent = label;
@@ -603,7 +604,7 @@ async function openDeleteProgramaDialog({ record, onChanged }) {
       console.error(error);
 
       message.textContent =
-        error.message || "No fue posible eliminar el Programa.";
+        friendlyErrorMessage(error, "No fue posible eliminar el Programa.");
 
       confirm.disabled = false;
       confirm.textContent = "Eliminar definitivamente";
@@ -1103,7 +1104,7 @@ function openImportProgramas({
         console.error(error);
 
         message.textContent =
-          error.message || "No fue posible leer el archivo.";
+          friendlyErrorMessage(error, "No fue posible leer el archivo.");
       }
     });
 
@@ -1142,7 +1143,7 @@ function openImportProgramas({
       console.error(error);
 
       message.textContent =
-        error.message || "No fue posible completar la importación.";
+        friendlyErrorMessage(error, "No fue posible completar la importación.");
 
       confirm.disabled = false;
       confirm.textContent = "Importar registros válidos";
@@ -1876,8 +1877,7 @@ export async function renderProgramas(container) {
         console.error(error);
 
         showToast(
-          error.message ||
-          "No fue posible copiar los Programas."
+          friendlyErrorMessage(error, "No fue posible copiar los Programas.")
         );
       }
     }
@@ -1894,8 +1894,7 @@ export async function renderProgramas(container) {
 
         <p>
           ${escapeHTML(
-            error.message ||
-            "No fue posible cargar los Programas. Intenta nuevamente."
+            friendlyErrorMessage(error, "No fue posible cargar los Programas. Intenta nuevamente.")
           )}
         </p>
       </div>

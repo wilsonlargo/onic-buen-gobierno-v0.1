@@ -1,6 +1,7 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { openModal, closeModal } from "../components/modal.js";
-import { roleLabel, getCurrentProfile } from "../security.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { roleLabel, getCurrentProfile } from "../security.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -218,7 +219,7 @@ function openUserForm({ record, data, onSaved }) {
       await onSaved();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible actualizar los permisos del usuario.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible actualizar los permisos del usuario.");
       submit.disabled = false;
       submit.textContent = "Guardar permisos";
     }
@@ -310,7 +311,7 @@ export async function renderUsuarios(container) {
       content.innerHTML = `
         <div class="empty-state">
           <strong>No fue posible cargar los usuarios.</strong>
-          <p>${escapeHTML(error.message || "Intenta nuevamente.")}</p>
+          <p>${escapeHTML(friendlyErrorMessage(error, "Intenta nuevamente."))}</p>
         </div>
       `;
     }

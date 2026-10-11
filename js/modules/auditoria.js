@@ -1,6 +1,7 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { openModal, closeModal } from "../components/modal.js";
-import { updateWithVersion } from "../security.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { updateWithVersion } from "../security.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 let currentContext = null;
 let initialized = false;
@@ -476,7 +477,7 @@ function openCreateNote(context = currentContext) {
       await refreshPanel();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible guardar la nota.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible guardar la nota.");
       submit.disabled = false;
       submit.textContent = "Guardar nota";
     }
@@ -560,7 +561,7 @@ function openEditNote(note) {
       await refreshPanel();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible actualizar la nota.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible actualizar la nota.");
       submit.disabled = false;
       submit.textContent = "Guardar cambios";
     }

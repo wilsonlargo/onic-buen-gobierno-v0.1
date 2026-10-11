@@ -1,8 +1,9 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { getCurrentProfile, canManageGlobalStructure } from "../security.js";
-import { openModal, closeModal } from "../components/modal.js";
-import { setAuditContext } from "./auditoria.js";
-import { getConsejeriaProgressMap } from "./consejeriaProgress.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { getCurrentProfile, canManageGlobalStructure } from "../security.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { setAuditContext } from "./auditoria.js?v=5.2.0";
+import { getConsejeriaProgressMap } from "./consejeriaProgress.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -499,7 +500,7 @@ function openNewCutDialog({ vigencia, onCreated }) {
       await onCreated?.();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible crear el corte.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible crear el corte.");
       submit.disabled = false;
       submit.textContent = "Crear corte y guardar fotografía";
     }
@@ -551,7 +552,7 @@ function stateConfirmation(cut, nextState, onConfirm) {
       closeModal();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible cambiar el estado del corte.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible cambiar el estado del corte.");
       button.disabled = false;
       button.textContent = copy.button;
     }
@@ -744,7 +745,7 @@ export async function renderCortesSeguimiento(container, navigationTarget = null
     } catch (error) {
       console.error(error);
       summaryHost.innerHTML = "";
-      chartHost.innerHTML = `<div class="empty-state"><strong>No fue posible cargar el histórico.</strong><p>${escapeHTML(error.message || "Intenta nuevamente.")}</p></div>`;
+      chartHost.innerHTML = `<div class="empty-state"><strong>No fue posible cargar el histórico.</strong><p>${escapeHTML(friendlyErrorMessage(error, "Intenta nuevamente."))}</p></div>`;
       listHost.innerHTML = "";
     }
   }
@@ -806,7 +807,7 @@ export async function renderCortesSeguimiento(container, navigationTarget = null
             await refresh();
           } catch (error) {
             console.error(error);
-            message.textContent = error.message || "No fue posible actualizar la fotografía.";
+            message.textContent = friendlyErrorMessage(error, "No fue posible actualizar la fotografía.");
             button.disabled = false;
             button.textContent = "Actualizar fotografía";
           }
@@ -829,7 +830,7 @@ export async function renderCortesSeguimiento(container, navigationTarget = null
   } catch (error) {
     console.error(error);
     selector.innerHTML = `<option value="">No disponible</option>`;
-    chartHost.innerHTML = `<div class="empty-state"><strong>No fue posible cargar Cortes de seguimiento.</strong><p>${escapeHTML(error.message || "Intenta nuevamente.")}</p></div>`;
+    chartHost.innerHTML = `<div class="empty-state"><strong>No fue posible cargar Cortes de seguimiento.</strong><p>${escapeHTML(friendlyErrorMessage(error, "Intenta nuevamente."))}</p></div>`;
     listHost.innerHTML = "";
   }
 }

@@ -1,6 +1,7 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { logManualEvent } from "../security.js";
-import { openModal, closeModal } from "../components/modal.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { logManualEvent } from "../security.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 const SUPPORTED_SCHEMA = "onic-buen-gobierno.v1";
 const MAX_FILE_BYTES = 12 * 1024 * 1024;
@@ -69,7 +70,7 @@ function validatePayload(payload) {
     Array.isArray(vigencia)
   ) {
     errors.push(
-      'Falta el objeto "vigencia".'
+      "El archivo no incluye la información principal de la Vigencia."
     );
   } else {
     if (!String(vigencia.nombre || "").trim()) {
@@ -1283,8 +1284,7 @@ export function openVigenciaImportDialog({
         console.error(error);
 
         message.textContent =
-          error.message ||
-          "No fue posible importar la Vigencia.";
+          friendlyErrorMessage(error, "No fue posible importar la Vigencia.");
 
         executeButton.disabled = false;
         executeButton.textContent =

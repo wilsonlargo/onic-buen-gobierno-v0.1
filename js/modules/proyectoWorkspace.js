@@ -1,9 +1,10 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { updateWithVersion, logManualEvent } from "../security.js";
-import { openModal, closeModal } from "../components/modal.js";
-import { setAuditContext, openAuditPanel } from "./auditoria.js";
-import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js";
-import { renderProjectPlanner, plannerColorOptions, exportProjectPlanner } from "./projectPlanner.js?v=0.12.1";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { updateWithVersion, logManualEvent } from "../security.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.2.0";
+import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.2.0";
+import { renderProjectPlanner, plannerColorOptions, exportProjectPlanner } from "./projectPlanner.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -447,7 +448,7 @@ function openActivityForm({ projectId, record = null, onSaved }) {
       await onSaved();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible guardar la actividad.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible guardar la actividad.");
       submit.disabled = false;
       submit.textContent = editing ? "Guardar cambios" : "Crear actividad";
     }
@@ -509,7 +510,7 @@ function openIndicatorForm({ activityId, record = null, onSaved }) {
       await onSaved();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible guardar el indicador.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible guardar el indicador.");
       submit.disabled = false;
       submit.textContent = editing ? "Guardar cambios" : "Crear indicador";
     }
@@ -548,7 +549,7 @@ function openIndicatorFollowup({ indicator, onSaved }) {
       await onSaved();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible registrar el avance.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible registrar el avance.");
       submit.disabled = false;
       submit.textContent = "Registrar avance";
     }
@@ -605,7 +606,7 @@ function openBudgetForm({ activityId, record = null, onSaved }) {
       await onSaved();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible guardar el rubro.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible guardar el rubro.");
       submit.disabled = false;
       submit.textContent = editing ? "Guardar cambios" : "Crear rubro";
     }
@@ -657,7 +658,7 @@ function openEvidenceForm({ activityId, indicators, record = null, onSaved }) {
       await onSaved();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible guardar la evidencia.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible guardar la evidencia.");
       submit.disabled = false;
       submit.textContent = editing ? "Guardar cambios" : "Crear evidencia";
     }
@@ -702,7 +703,7 @@ function openActivityFollowup({ activityId, onSaved }) {
       await onSaved();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible guardar el seguimiento.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible guardar el seguimiento.");
       submit.disabled = false;
       submit.textContent = "Guardar seguimiento";
     }
@@ -944,7 +945,7 @@ export async function renderProyectoWorkspace(container, options) {
         showToast("Perfil del Proyecto actualizado.");
       } catch (error) {
         console.error(error);
-        message.textContent = error.message || "No fue posible guardar el Perfil.";
+        message.textContent = friendlyErrorMessage(error, "No fue posible guardar el Perfil.");
         submit.disabled = false;
         submit.textContent = "Guardar Perfil";
       }
@@ -986,7 +987,7 @@ export async function renderProyectoWorkspace(container, options) {
             showToast("Actividad marcada como cancelada.");
           } catch (error) {
             console.error(error);
-            document.querySelector("#activityProtectionMessage").textContent = error.message || "No fue posible actualizar la actividad.";
+            document.querySelector("#activityProtectionMessage").textContent = friendlyErrorMessage(error, "No fue posible actualizar la actividad.");
             cancelButton.disabled = false;
             cancelButton.textContent = "Marcar como cancelada";
           }
@@ -1022,7 +1023,7 @@ export async function renderProyectoWorkspace(container, options) {
         showToast("Actividad eliminada.");
       } catch (error) {
         console.error(error);
-        document.querySelector("#deleteActivityMessage").textContent = error.message || "No fue posible eliminar la actividad.";
+        document.querySelector("#deleteActivityMessage").textContent = friendlyErrorMessage(error, "No fue posible eliminar la actividad.");
         confirm.disabled = false;
         confirm.textContent = "Eliminar actividad";
       }
@@ -1088,7 +1089,7 @@ export async function renderProyectoWorkspace(container, options) {
         showToast("Color del Planeador actualizado.");
       } catch (error) {
         console.error(error);
-        if (message) message.textContent = error.message || "No fue posible actualizar el color.";
+        if (message) message.textContent = friendlyErrorMessage(error, "No fue posible actualizar el color.");
         document.querySelectorAll("[data-planner-color]").forEach((item) => { item.disabled = false; });
       }
     }));
@@ -1173,7 +1174,7 @@ export async function renderProyectoWorkspace(container, options) {
           showToast(`Planeador exportado en ${format === "pdf" ? "PDF" : "Excel"}.`);
         } catch (error) {
           console.error(error);
-          showToast(error.message || "No fue posible exportar el Planeador.");
+          showToast(friendlyErrorMessage(error, "No fue posible exportar el Planeador."));
         }
       }
     });
@@ -1456,7 +1457,7 @@ export async function renderProyectoWorkspace(container, options) {
         renderActivityWorkspace();
         showToast("Actividad actualizada.");
       } catch (error) {
-        console.error(error); message.textContent = error.message || "No fue posible guardar la actividad."; submit.disabled = false; submit.textContent = "Guardar actividad";
+        console.error(error); message.textContent = friendlyErrorMessage(error, "No fue posible guardar la actividad."); submit.disabled = false; submit.textContent = "Guardar actividad";
       }
     });
   }
@@ -1495,7 +1496,7 @@ export async function renderProyectoWorkspace(container, options) {
             showToast("Indicador inactivado.");
           } catch (error) {
             console.error(error);
-            document.querySelector("#indicatorProtectionMessage").textContent = error.message || "No fue posible inactivar el indicador.";
+            document.querySelector("#indicatorProtectionMessage").textContent = friendlyErrorMessage(error, "No fue posible inactivar el indicador.");
             inactivate.disabled = false;
           }
         });
@@ -1519,7 +1520,7 @@ export async function renderProyectoWorkspace(container, options) {
         showToast("Indicador eliminado.");
       } catch (error) {
         console.error(error);
-        showToast(error.message || "No fue posible eliminar el indicador.");
+        showToast(friendlyErrorMessage(error, "No fue posible eliminar el indicador."));
       }
     });
   }
@@ -1634,7 +1635,7 @@ export async function renderProyectoWorkspace(container, options) {
         renderActivityTab();
         showToast("Rubro eliminado.");
       } catch (error) {
-        console.error(error); showToast(error.message || "No fue posible eliminar el rubro.");
+        console.error(error); showToast(friendlyErrorMessage(error, "No fue posible eliminar el rubro."));
       }
     }));
   }
@@ -1734,7 +1735,7 @@ export async function renderProyectoWorkspace(container, options) {
     if (activityTab === "indicadores") renderIndicators();
     else if (activityTab === "presupuesto") renderBudget();
     else if (activityTab === "evidencias") renderEvidence();
-    else if (activityTab === "seguimiento") renderActivityTracking().catch((error) => { console.error(error); showToast(error.message || "No fue posible cargar el seguimiento."); });
+    else if (activityTab === "seguimiento") renderActivityTracking().catch((error) => { console.error(error); showToast(friendlyErrorMessage(error, "No fue posible cargar el seguimiento.")); });
     else renderActivityGeneral();
   }
 
@@ -1772,7 +1773,7 @@ export async function renderProyectoWorkspace(container, options) {
     }
   } catch (error) {
     console.error(error);
-    container.innerHTML = `<section class="panel" style="margin-top:0"><p class="eyebrow">Proyecto</p><h2>No fue posible abrir el espacio de trabajo</h2><p class="muted">${escapeHTML(error.message || "No fue posible cargar la información del Proyecto. Intenta nuevamente o informa al administrador del Sistema.")}</p><div style="margin-top:16px"><button id="workspaceErrorBack" class="btn btn-secondary" type="button">Volver a Proyectos</button></div></section>`;
+    container.innerHTML = `<section class="panel" style="margin-top:0"><p class="eyebrow">Proyecto</p><h2>No fue posible abrir el espacio de trabajo</h2><p class="muted">${escapeHTML(friendlyErrorMessage(error, "No fue posible cargar la información del Proyecto. Intenta nuevamente o informa al administrador del Sistema."))}</p><div style="margin-top:16px"><button id="workspaceErrorBack" class="btn btn-secondary" type="button">Volver a Proyectos</button></div></section>`;
     container.querySelector("#workspaceErrorBack").addEventListener("click", onBack);
   }
 }

@@ -1,6 +1,6 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { setAuditContext, openAuditPanel } from "./auditoria.js";
-import { isConsejeriaUser } from "../security.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.2.0";
+import { isConsejeriaUser } from "../security.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -513,20 +513,18 @@ export async function renderSeguimientoMandatos(container, navigationTarget = nu
       </div>
     </div>
 
-    <section class="panel mandate-follow-intro" style="margin-top:0">
+    <details class="panel mandate-follow-intro module-help" style="margin-top:0">
+      <summary>Cómo interpretar el avance asociado de los Mandatos</summary>
       <div>
-        <p class="eyebrow">¿Qué muestra esta sección?</p>
-        <h2>Mandatos y Proyectos que contribuyen a su atención</h2>
         <p>
-          El avance asociado se calcula a partir del avance técnico de los Proyectos vinculados a cada Mandato.
-          Esta lectura facilita el seguimiento del Plan, pero <strong>no equivale por sí sola al cumplimiento integral del Mandato</strong>.
+          El avance asociado toma como referencia el avance técnico de los Proyectos vinculados a cada Mandato.
+          Sirve para orientar el seguimiento del Plan, pero <strong>no representa por sí solo el cumplimiento integral del Mandato</strong>.
         </p>
         <p>
-          Cuando un Mandato tiene Proyectos ubicados en Programas diferentes, cada Proyecto participa de forma equivalente en esta lectura.
-          De esta manera no se mezclan ponderaciones que solo son comparables dentro de un mismo Programa.
+          Si un Mandato tiene Proyectos en Programas diferentes, cada Proyecto participa de forma equivalente para no mezclar ponderaciones que pertenecen a estructuras distintas.
         </p>
       </div>
-    </section>
+    </details>
 
     <section class="panel mandate-follow-filters">
       <div class="mandate-follow-filter-grid">

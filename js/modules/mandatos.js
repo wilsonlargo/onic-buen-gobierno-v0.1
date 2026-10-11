@@ -1,6 +1,7 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { updateWithVersion } from "../security.js";
-import { openModal, closeModal } from "../components/modal.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { updateWithVersion } from "../security.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -439,7 +440,7 @@ async function openDeleteMandatoDialog({ record, onDeleted }) {
           console.error(error);
 
           message.textContent =
-            error.message || "No fue posible archivar el Mandato.";
+            friendlyErrorMessage(error, "No fue posible archivar el Mandato.");
 
           archive.disabled = false;
           archive.textContent = "Archivar mandato";
@@ -508,7 +509,7 @@ async function openDeleteMandatoDialog({ record, onDeleted }) {
       await onDeleted();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible eliminar el mandato.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible eliminar el mandato.");
       button.disabled = false;
       button.textContent = "Eliminar mandato";
     }
@@ -601,7 +602,7 @@ function openBulkDeleteDialog({
       await onDeleted(count);
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible completar la eliminación.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible completar la eliminación.");
       confirm.disabled = false;
       confirm.textContent = deletingAll ? "Eliminar todos" : "Eliminar seleccionados";
     }
@@ -691,7 +692,7 @@ function openFuenteForm({ vigencia, onSaved }) {
       await onSaved();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible crear la fuente.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible crear la fuente.");
       button.disabled = false;
       button.textContent = "Crear fuente";
     }
@@ -831,7 +832,7 @@ function openMandatoForm({ vigencia, fuentes, consejerias, record = null, onSave
       await onSaved();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible guardar el mandato.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible guardar el mandato.");
       button.disabled = false;
       button.textContent = editing ? "Guardar cambios" : "Crear mandato";
     }
@@ -1305,7 +1306,7 @@ function openBulkImport({
       setRows(rawRows);
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible interpretar los datos pegados.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible interpretar los datos pegados.");
     }
   });
 
@@ -1336,7 +1337,7 @@ function openBulkImport({
       setRows(rawRows);
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible leer el archivo.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible leer el archivo.");
     }
   });
 
@@ -1359,7 +1360,7 @@ function openBulkImport({
       await onImported(result);
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "La importación no pudo completarse.";
+      message.textContent = friendlyErrorMessage(error, "La importación no pudo completarse.");
       confirm.disabled = false;
       confirm.textContent = `Importar ${validCount} ${validCount === 1 ? "mandato" : "mandatos"}`;
     }
@@ -1838,7 +1839,7 @@ export async function renderMandatos(container) {
       showToast(`${mandatos.length} mandato(s) copiados al portapapeles.`);
     } catch (error) {
       console.error(error);
-      showToast(error.message || "No fue posible copiar la tabla.");
+      showToast(friendlyErrorMessage(error, "No fue posible copiar la tabla."));
     }
   });
 
@@ -1902,7 +1903,7 @@ export async function renderMandatos(container) {
     content.innerHTML = `
       <div class="empty-state">
         <strong>No fue posible cargar Mandatos.</strong>
-        <p>${escapeHTML(error.message || "No fue posible cargar los Mandatos. Intenta nuevamente.")}</p>
+        <p>${escapeHTML(friendlyErrorMessage(error, "No fue posible cargar los Mandatos. Intenta nuevamente."))}</p>
       </div>
     `;
   }

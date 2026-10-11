@@ -1,5 +1,6 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { openModal, closeModal } from "../components/modal.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -92,8 +93,7 @@ export async function openForceDeleteVigenciaDialog({
           <strong>La operación permanece bloqueada.</strong>
           <p>
             ${escapeHTML(
-              error.message ||
-              "No fue posible consultar las dependencias de la Vigencia."
+              friendlyErrorMessage(error, "No fue posible consultar las dependencias de la Vigencia.")
             )}
           </p>
         </div>
@@ -519,8 +519,7 @@ export async function openForceDeleteVigenciaDialog({
         console.error(error);
 
         message.textContent =
-          error.message ||
-          "No fue posible eliminar la Vigencia. La operación fue cancelada.";
+          friendlyErrorMessage(error, "No fue posible eliminar la Vigencia. La operación fue cancelada.");
 
         confirm.disabled = false;
         confirm.textContent =

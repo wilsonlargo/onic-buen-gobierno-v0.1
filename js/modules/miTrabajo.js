@@ -1,6 +1,6 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { getCurrentProfile } from "../security.js";
-import { setAuditContext } from "./auditoria.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { getCurrentProfile } from "../security.js?v=5.2.0";
+import { setAuditContext } from "./auditoria.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")

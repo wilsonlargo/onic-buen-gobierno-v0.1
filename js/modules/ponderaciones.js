@@ -1,7 +1,8 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { canApproveWeights } from "../security.js";
-import { openModal, closeModal } from "../components/modal.js";
-import { setAuditContext, openAuditPanel } from "./auditoria.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { canApproveWeights } from "../security.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -290,43 +291,32 @@ function noteContext({ vigencia, consejeria, linea = null, programa = null, proy
 
 function approvalHelpHTML() {
   return `
-    <section class="panel ponderacion-guide">
-      <div class="ponderacion-guide-head">
-        <div>
-          <p class="eyebrow">Orientación</p>
-          <h3>¿Cómo funciona la ponderación?</h3>
+    <details class="panel ponderacion-guide module-help">
+      <summary>Cómo funciona la ponderación · Los cambios son borrador hasta aprobar</summary>
+      <div>
+        <div class="ponderacion-guide-grid">
+          <div>
+            <strong>Qué representa</strong>
+            <p>
+              La ponderación define cuánto aporta cada Proyecto al resultado de su Programa.
+              No equivale al avance ni al presupuesto. Solo se edita en los Proyectos.
+            </p>
+          </div>
+          <div>
+            <strong>Reglas principales</strong>
+            <ul>
+              <li>La suma de los Proyectos de cada Programa debe ser exactamente 100 %.</li>
+              <li><strong>Ponderación sugerida</strong> reparte el 100 % por partes iguales y luego puede ajustarse.</li>
+              <li>Considere relevancia estratégica, resultados esperados y contribución a los Mandatos.</li>
+              <li>No use el presupuesto como único criterio.</li>
+            </ul>
+          </div>
         </div>
-        <span class="status-chip active">Borrador hasta aprobar</span>
-      </div>
-
-      <div class="ponderacion-guide-grid">
-        <div>
-          <strong>Qué representa</strong>
-          <p>
-            La ponderación define cuánto aporta cada Proyecto al resultado de su Programa.
-            No equivale al avance ni al presupuesto. Las Líneas de Acción y los Programas
-            mantienen ponderación automática; únicamente se editan los Proyectos.
-          </p>
-        </div>
-
-        <div>
-          <strong>Consejos para ponderar</strong>
-          <ul>
-            <li>Considere la relevancia estratégica y los resultados esperados.</li>
-            <li>Revise la contribución del Proyecto a los Mandatos y al propósito del Programa.</li>
-            <li>No use el presupuesto como único criterio.</li>
-            <li><strong>Ponderación sugerida</strong> distribuye equitativamente el 100 % entre los Proyectos del Programa y luego puede ajustarse manualmente.</li>
-            <li>La suma de los Proyectos de cada Programa debe ser exactamente 100 %.</li>
-          </ul>
+        <div class="ponderacion-draft-note">
+          Los cambios solo quedan registrados al seleccionar <strong>Aprobar ponderación</strong>.
         </div>
       </div>
-
-      <div class="ponderacion-draft-note">
-        <strong>Importante:</strong>
-        cualquier cambio realizado en esta pantalla es una propuesta temporal.
-        Los cambios solo quedan registrados al seleccionar <strong>Aprobar ponderación</strong>.
-      </div>
-    </section>
+    </details>
   `;
 }
 
@@ -945,7 +935,7 @@ export async function renderPonderaciones(container, navigationTarget = null) {
         if (refreshedMessage) refreshedMessage.textContent = "Ponderación aprobada correctamente.";
       } catch (error) {
         console.error(error);
-        message.textContent = error.message || "No fue posible aprobar la ponderación.";
+        message.textContent = friendlyErrorMessage(error, "No fue posible aprobar la ponderación.");
         button.disabled = false;
         button.textContent = "Aprobar ponderación";
       }
@@ -1005,7 +995,7 @@ export async function renderPonderaciones(container, navigationTarget = null) {
       lastApproval = await getLastApproval(selectedConsejeriaId);
     } catch (error) {
       console.error(error);
-      if (String(error.message || "").toLowerCase().includes("ponderacion_consejeria_aprobaciones")) {
+      if (String(friendlyErrorMessage(error, "")).toLowerCase().includes("ponderacion_consejeria_aprobaciones")) {
         content.innerHTML = `
           <div class="danger-callout">
             <strong>El módulo de Ponderaciones no está disponible en este momento.</strong>
@@ -1071,7 +1061,7 @@ export async function renderPonderaciones(container, navigationTarget = null) {
     content.innerHTML = `
       <div class="empty-state">
         <strong>No fue posible cargar el módulo Ponderaciones.</strong>
-        <p>${escapeHTML(error.message || "No fue posible cargar las Ponderaciones. Intenta nuevamente.")}</p>
+        <p>${escapeHTML(friendlyErrorMessage(error, "No fue posible cargar las Ponderaciones. Intenta nuevamente."))}</p>
       </div>
     `;
   }

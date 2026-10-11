@@ -1,5 +1,5 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { setAuditContext } from "./auditoria.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { setAuditContext } from "./auditoria.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")

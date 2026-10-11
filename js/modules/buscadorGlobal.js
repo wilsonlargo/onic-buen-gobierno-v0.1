@@ -1,5 +1,6 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { openModal, closeModal } from "../components/modal.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { uiIcon } from "../components/uiSystem.js?v=5.2.0";
 
 let cachedIndex = null;
 let cachedAt = 0;
@@ -25,18 +26,18 @@ function normalize(value = "") {
 
 function iconFor(type) {
   const icons = {
-    vigencia: "◫",
-    consejeria: "◎",
-    linea: "≡",
-    programa: "▤",
-    proyecto: "▣",
-    actividad: "✓",
-    indicador: "↗",
-    evidencia: "◆",
-    mandato: "◇",
-    compromiso: "!"
+    vigencia: "calendar",
+    consejeria: "users",
+    linea: "layers",
+    programa: "programs",
+    proyecto: "projects",
+    actividad: "work",
+    indicador: "trend",
+    evidencia: "file",
+    mandato: "mandate",
+    compromiso: "work"
   };
-  return icons[type] || "•";
+  return uiIcon(icons[type] || "search", "global-search-entity-icon");
 }
 
 function typeLabel(type) {

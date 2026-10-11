@@ -13,7 +13,7 @@ export const supabaseClient = isSupabaseConfigured
 export function requireSupabase() {
   if (!supabaseClient) {
     throw new Error(
-      "Supabase no está configurado. Completa js/config.js con la URL y la clave pública del proyecto."
+      "El Sistema no está disponible en este momento. Contacta al Administrador."
     );
   }
 

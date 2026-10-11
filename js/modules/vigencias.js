@@ -1,9 +1,10 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { openModal, closeModal } from "../components/modal.js";
-import { openVigenciaImportDialog } from "./vigenciaImporter.js?v=0.14.0";
-import { openForceDeleteVigenciaDialog } from "./vigenciaForceDelete.js?v=0.14.0";
-import { openVigenciaBackupDialog } from "./vigenciaBackup.js?v=0.14.0";
-import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { openVigenciaImportDialog } from "./vigenciaImporter.js?v=5.2.0";
+import { openForceDeleteVigenciaDialog } from "./vigenciaForceDelete.js?v=5.2.0";
+import { openVigenciaBackupDialog } from "./vigenciaBackup.js?v=5.2.0";
+import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value)
@@ -192,7 +193,7 @@ function openCreateForm(onCreated) {
       await onCreated();
     } catch (error) {
       console.error(error);
-      message.textContent = error.message || "No fue posible guardar la vigencia.";
+      message.textContent = friendlyErrorMessage(error, "No fue posible guardar la vigencia.");
     } finally {
       submit.disabled = false;
       submit.textContent = "Guardar vigencia";

@@ -1,8 +1,9 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { updateWithVersion } from "../security.js";
-import { openModal, closeModal } from "../components/modal.js";
-import { renderProyectoWorkspace } from "./proyectoWorkspace.js?v=0.12.1";
-import { setAuditContext, openAuditPanel } from "./auditoria.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { updateWithVersion } from "../security.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { renderProyectoWorkspace } from "./proyectoWorkspace.js?v=5.2.0";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -764,7 +765,7 @@ function openProyectoForm({
     } catch (error) {
       console.error(error);
       message.textContent =
-        error.message || "No fue posible guardar el Proyecto.";
+        friendlyErrorMessage(error, "No fue posible guardar el Proyecto.");
 
       submit.disabled = false;
       submit.textContent = editing
@@ -887,7 +888,7 @@ async function openDeleteProyectoDialog({ record, onChanged }) {
         } catch (error) {
           console.error(error);
           message.textContent =
-            error.message || "No fue posible cerrar el Proyecto.";
+            friendlyErrorMessage(error, "No fue posible cerrar el Proyecto.");
 
           closeRecord.disabled = false;
           closeRecord.textContent = "Marcar como cerrado";
@@ -988,7 +989,7 @@ async function openDeleteProyectoDialog({ record, onChanged }) {
     } catch (error) {
       console.error(error);
       message.textContent =
-        error.message || "No fue posible eliminar el Proyecto.";
+        friendlyErrorMessage(error, "No fue posible eliminar el Proyecto.");
 
       confirm.disabled = false;
       confirm.textContent = "Eliminar definitivamente";
@@ -1681,7 +1682,7 @@ function openImportProyectos({
         console.error(error);
 
         message.textContent =
-          error.message || "No fue posible leer el archivo.";
+          friendlyErrorMessage(error, "No fue posible leer el archivo.");
       }
     });
 
@@ -1734,7 +1735,7 @@ function openImportProyectos({
       console.error(error);
 
       message.textContent =
-        error.message || "No fue posible completar la importación.";
+        friendlyErrorMessage(error, "No fue posible completar la importación.");
 
       confirm.disabled = false;
       confirm.textContent = "Importar registros válidos";
@@ -1762,7 +1763,7 @@ export async function renderProyectos(container, navigationTarget = null) {
   container.innerHTML = `
     <div class="page-actions">
       <div>
-        <p class="eyebrow">Nodo operativo central</p>
+        <p class="eyebrow">Planeación operativa</p>
         <h2>Proyectos</h2>
       </div>
 
@@ -2769,8 +2770,7 @@ export async function renderProyectos(container, navigationTarget = null) {
         console.error(error);
 
         showToast(
-          error.message ||
-          "No fue posible copiar los Proyectos."
+          friendlyErrorMessage(error, "No fue posible copiar los Proyectos.")
         );
       }
     }
@@ -2827,8 +2827,7 @@ export async function renderProyectos(container, navigationTarget = null) {
 
         <p>
           ${escapeHTML(
-            error.message ||
-            "No fue posible cargar los Proyectos. Intenta nuevamente o informa al administrador del Sistema."
+            friendlyErrorMessage(error, "No fue posible cargar los Proyectos. Intenta nuevamente o informa al administrador del Sistema.")
           )}
         </p>
       </div>

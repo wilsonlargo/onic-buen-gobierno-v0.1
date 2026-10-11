@@ -1,21 +1,21 @@
-import { supabaseClient, isSupabaseConfigured } from "./supabaseClient.js";
-import { renderInicio } from "./modules/inicio.js?v=0.14.0";
-import { renderVigencias } from "./modules/vigencias.js?v=0.14.0";
-import { renderConsejerias } from "./modules/consejerias.js";
-import { renderMandatos } from "./modules/mandatos.js";
-import { renderSeguimientoMandatos } from "./modules/seguimientoMandatos.js?v=0.15.0";
-import { renderMiTrabajo } from "./modules/miTrabajo.js?v=0.16.0";
-import { renderControlCalidad } from "./modules/controlCalidad.js?v=0.16.0";
-import { initGlobalSearch } from "./modules/buscadorGlobal.js?v=0.16.0";
-import { renderLineas } from "./modules/lineas.js";
-import { renderProgramas } from "./modules/programas.js";
-import { renderProyectos } from "./modules/proyectos.js?v=0.13.0";
-import { renderPonderaciones } from "./modules/ponderaciones.js";
-import { renderCortesSeguimiento } from "./modules/cortesSeguimiento.js?v=0.13.3";
-import { renderAlertasTareas } from "./modules/alertasTareas.js?v=0.14.0";
-import { renderHistorial } from "./modules/historial.js?v=0.14.0";
-import { renderUsuarios } from "./modules/usuarios.js";
-import { initAuditoria, clearAuditContext } from "./modules/auditoria.js";
+import { supabaseClient, isSupabaseConfigured } from "./supabaseClient.js?v=5.2.0";
+import { renderInicio } from "./modules/inicio.js?v=5.2.0";
+import { renderVigencias } from "./modules/vigencias.js?v=5.2.0";
+import { renderConsejerias } from "./modules/consejerias.js?v=5.2.0";
+import { renderMandatos } from "./modules/mandatos.js?v=5.2.0";
+import { renderSeguimientoMandatos } from "./modules/seguimientoMandatos.js?v=5.2.0";
+import { renderMiTrabajo } from "./modules/miTrabajo.js?v=5.2.0";
+import { renderControlCalidad } from "./modules/controlCalidad.js?v=5.2.0";
+import { initGlobalSearch } from "./modules/buscadorGlobal.js?v=5.2.0";
+import { renderLineas } from "./modules/lineas.js?v=5.2.0";
+import { renderProgramas } from "./modules/programas.js?v=5.2.0";
+import { renderProyectos } from "./modules/proyectos.js?v=5.2.0";
+import { renderPonderaciones } from "./modules/ponderaciones.js?v=5.2.0";
+import { renderCortesSeguimiento } from "./modules/cortesSeguimiento.js?v=5.2.0";
+import { renderAlertasTareas } from "./modules/alertasTareas.js?v=5.2.0";
+import { renderHistorial } from "./modules/historial.js?v=5.2.0";
+import { renderUsuarios } from "./modules/usuarios.js?v=5.2.0";
+import { initAuditoria, clearAuditContext } from "./modules/auditoria.js?v=5.2.0";
 import {
   loadCurrentUserProfile,
   clearSecuritySession,
@@ -26,7 +26,9 @@ import {
   applyViewPermissions,
   startPermissionObserver,
   logSessionEvent
-} from "./security.js";
+} from "./security.js?v=5.2.0";
+import { friendlyErrorMessage } from "./userMessages.js?v=5.2.0";
+import { initUserInterface, enhanceUserInterface } from "./components/uiSystem.js?v=5.2.0";
 
 const loginView = document.querySelector("#loginView");
 const appView = document.querySelector("#appView");
@@ -115,6 +117,7 @@ async function showApp(session, { registerLogin = false } = {}) {
     userDisplayName.title = profile.email || "";
 
     applyNavigationPermissions(document);
+    enhanceUserInterface(mainNav);
     startPermissionObserver(mainContent, () => currentViewName);
 
     initAuditoria({
@@ -134,7 +137,7 @@ async function showApp(session, { registerLogin = false } = {}) {
   } catch (error) {
     console.error(error);
     await supabaseClient?.auth?.signOut();
-    showLogin(error.message || "No fue posible validar tus permisos de acceso.");
+    showLogin(friendlyErrorMessage(error, "No fue posible validar tus permisos de acceso."));
   }
 }
 
@@ -146,26 +149,37 @@ async function navigate(viewName, navigationTarget = null) {
   currentViewName = viewName;
 
   document.querySelectorAll(".nav-item").forEach((item) => {
-    item.classList.toggle("active", item.dataset.view === viewName);
+    const active = item.dataset.view === viewName;
+    item.classList.toggle("active", active);
+    if (active) item.setAttribute("aria-current", "page");
+    else item.removeAttribute("aria-current");
   });
 
   pageTitle.textContent = selected.title;
-  mainContent.innerHTML = `<div class="empty-state">Cargando…</div>`;
+  mainContent.setAttribute("aria-busy", "true");
+  mainContent.innerHTML = `<div class="module-loading"><span class="loading-spinner" aria-hidden="true"></span><span>Cargando ${selected.title.toLocaleLowerCase("es")}…</span></div>`;
   clearAuditContext();
 
   try {
     await selected.render(mainContent, navigationTarget);
     applyViewPermissions(viewName, mainContent);
+    enhanceUserInterface(mainContent);
+    window.scrollTo({ top: 0, behavior: "auto" });
     mainContent.focus({ preventScroll: true });
   } catch (error) {
     console.error(error);
     mainContent.innerHTML = `
-      <section class="panel" style="margin-top: 0">
-        <p class="eyebrow">Error</p>
-        <h2>No fue posible cargar el módulo</h2>
-        <p class="muted">${String(error?.message || "Intenta nuevamente. Si el problema continúa, informa al Administrador del Sistema.")}</p>
+      <section class="panel module-error-panel" style="margin-top: 0">
+        <p class="eyebrow">No disponible</p>
+        <h2>No fue posible cargar este módulo</h2>
+        <p class="muted">${friendlyErrorMessage(error, "Intenta nuevamente. Si el problema continúa, informa al Administrador del Sistema.")}</p>
+        <button class="btn btn-secondary" type="button" data-retry-view="${viewName}">Intentar nuevamente</button>
       </section>
     `;
+    mainContent.querySelector("[data-retry-view]")?.addEventListener("click", () => navigate(viewName, navigationTarget));
+    enhanceUserInterface(mainContent);
+  } finally {
+    mainContent.setAttribute("aria-busy", "false");
   }
 }
 
@@ -263,4 +277,5 @@ async function boot() {
   });
 }
 
+initUserInterface();
 boot();

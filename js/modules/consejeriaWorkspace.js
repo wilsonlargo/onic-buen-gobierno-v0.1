@@ -1,12 +1,13 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { updateWithVersion } from "../security.js";
-import { openModal, closeModal } from "../components/modal.js";
-import { setAuditContext } from "./auditoria.js";
-import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { updateWithVersion } from "../security.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { setAuditContext } from "./auditoria.js?v=5.2.0";
+import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.2.0";
 import {
   formatConsejeriaProgress,
   getConsejeriaProgressState
-} from "./consejeriaProgress.js";
+} from "./consejeriaProgress.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -652,8 +653,7 @@ function openDeleteDocumentDialog({
       console.error(error);
 
       message.textContent =
-        error.message ||
-        "No fue posible eliminar el documento.";
+        friendlyErrorMessage(error, "No fue posible eliminar el documento.");
 
       confirm.disabled = false;
       confirm.textContent =
@@ -860,8 +860,7 @@ function openDocumentForm({
     } catch (error) {
       console.error(error);
       message.textContent =
-        error.message ||
-        "No fue posible guardar el documento.";
+        friendlyErrorMessage(error, "No fue posible guardar el documento.");
 
       submit.disabled = false;
       submit.textContent =
@@ -1411,8 +1410,7 @@ export async function renderConsejeriaWorkspace(
         console.error(error);
 
         message.textContent =
-          error.message ||
-          "No fue posible guardar el Perfil.";
+          friendlyErrorMessage(error, "No fue posible guardar el Perfil.");
 
         submit.disabled = false;
         submit.textContent = "Guardar Perfil";
@@ -1806,8 +1804,7 @@ export async function renderConsejeriaWorkspace(
             `;
           } else {
             message.textContent =
-              error.message ||
-              "No fue posible actualizar los Mandatos.";
+              friendlyErrorMessage(error, "No fue posible actualizar los Mandatos.");
           }
 
           button.disabled = false;
@@ -2414,8 +2411,7 @@ export async function renderConsejeriaWorkspace(
 
         <p class="muted">
           ${escapeHTML(
-            error.message ||
-            "No fue posible abrir la información de la Consejería. Intenta nuevamente o informa al administrador del Sistema."
+            friendlyErrorMessage(error, "No fue posible abrir la información de la Consejería. Intenta nuevamente o informa al administrador del Sistema.")
           )}
         </p>
 

@@ -1,8 +1,9 @@
-import { requireSupabase } from "../supabaseClient.js";
-import { setAuditContext } from "./auditoria.js";
-import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js";
-import { loadOfficialTrackingSeries, renderTrackingChart } from "./cortesSeguimiento.js?v=0.13.1";
-import { loadAlertSummary, updateAlertsNavBadge } from "./alertasTareas.js?v=0.14.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { setAuditContext } from "./auditoria.js?v=5.2.0";
+import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.2.0";
+import { loadOfficialTrackingSeries, renderTrackingChart } from "./cortesSeguimiento.js?v=5.2.0";
+import { loadAlertSummary, updateAlertsNavBadge } from "./alertasTareas.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -1253,8 +1254,7 @@ export async function renderInicio(container, navigationTarget = null) {
 
           <p>
             ${escapeHTML(
-              error.message ||
-              "No fue posible actualizar la información. Intenta nuevamente."
+              friendlyErrorMessage(error, "No fue posible actualizar la información. Intenta nuevamente.")
             )}
           </p>
         </div>
@@ -1358,8 +1358,7 @@ export async function renderInicio(container, navigationTarget = null) {
 
         <p>
           ${escapeHTML(
-            error.message ||
-            "No fue posible actualizar la información. Intenta nuevamente."
+            friendlyErrorMessage(error, "No fue posible actualizar la información. Intenta nuevamente.")
           )}
         </p>
       </div>

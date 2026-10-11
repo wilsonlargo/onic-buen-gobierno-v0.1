@@ -1,12 +1,13 @@
-import { requireSupabase } from "../supabaseClient.js";
+import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
 import {
   canManageGlobalStructure,
   getCurrentProfile,
   isReadOnlyUser,
   updateWithVersion
-} from "../security.js";
-import { openModal, closeModal } from "../components/modal.js";
-import { setAuditContext } from "./auditoria.js";
+} from "../security.js?v=5.2.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
+import { setAuditContext } from "./auditoria.js?v=5.2.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -950,7 +951,7 @@ export async function renderAlertasTareas(container, navigationTarget = null, op
         await refreshData();
       } catch (error) {
         console.error(error);
-        message.textContent = error.message || "No fue posible guardar el compromiso.";
+        message.textContent = friendlyErrorMessage(error, "No fue posible guardar el compromiso.");
         submit.disabled = false;
       }
     });
@@ -985,7 +986,7 @@ export async function renderAlertasTareas(container, navigationTarget = null, op
         await refreshData();
       } catch (error) {
         console.error(error);
-        message.textContent = error.message || "No fue posible completar el compromiso.";
+        message.textContent = friendlyErrorMessage(error, "No fue posible completar el compromiso.");
         submit.disabled = false;
       }
     });
@@ -998,7 +999,7 @@ export async function renderAlertasTareas(container, navigationTarget = null, op
       await refreshData();
     } catch (error) {
       console.error(error);
-      alert(error.message || "No fue posible actualizar el compromiso.");
+      alert(friendlyErrorMessage(error, "No fue posible actualizar el compromiso."));
     }
   }
 
@@ -1185,7 +1186,7 @@ export async function renderAlertasTareas(container, navigationTarget = null, op
       renderCurrentTab();
     } catch (error) {
       console.error(error);
-      summaryHost.innerHTML = `<div class="empty-state"><strong>No fue posible cargar el Centro.</strong><p>${escapeHTML(error.message || "Intenta nuevamente.")}</p></div>`;
+      summaryHost.innerHTML = `<div class="empty-state"><strong>No fue posible cargar el Centro.</strong><p>${escapeHTML(friendlyErrorMessage(error, "Intenta nuevamente."))}</p></div>`;
       body.innerHTML = `<div class="empty-state">No fue posible cargar las alertas y compromisos.</div>`;
     }
   }
@@ -1241,6 +1242,6 @@ export async function renderAlertasTareas(container, navigationTarget = null, op
     await loadConsejeriaSelector();
   } catch (error) {
     console.error(error);
-    body.innerHTML = `<div class="empty-state"><strong>No fue posible iniciar el Centro de alertas.</strong><p>${escapeHTML(error.message || "Intenta nuevamente.")}</p></div>`;
+    body.innerHTML = `<div class="empty-state"><strong>No fue posible iniciar el Centro de alertas.</strong><p>${escapeHTML(friendlyErrorMessage(error, "Intenta nuevamente."))}</p></div>`;
   }
 }
