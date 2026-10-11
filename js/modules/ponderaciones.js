@@ -1,8 +1,8 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
-import { canApproveWeights } from "../security.js?v=5.2.0";
-import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.2.0";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
+import { canApproveWeights } from "../security.js?v=5.3.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.3.0";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.3.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.3.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -710,7 +710,7 @@ export async function renderPonderaciones(container, navigationTarget = null) {
                                     </td>
                                     <td>
                                       <strong>${formatPercent(progressValue)}</strong>
-                                      <small>${progressValue === null ? "Sin medición completa" : "Cumplimiento técnico"}</small>
+                                      <small>${progressValue === null ? "Sin medición completa" : "Avance técnico"}</small>
                                     </td>
                                     <td>
                                       <button class="btn btn-secondary note-project-weight" data-id="${project.id}" data-program-id="${programa.id}" type="button">Nota</button>

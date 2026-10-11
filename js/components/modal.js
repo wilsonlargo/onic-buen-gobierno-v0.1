@@ -1,3 +1,5 @@
+import { confirmNavigationAway } from "./uiSystem.js?v=5.3.0";
+
 const backdrop = document.querySelector("#modalBackdrop");
 const body = document.querySelector("#modalBody");
 const title = document.querySelector("#modalTitle");
@@ -16,14 +18,19 @@ export function closeModal() {
   body.innerHTML = "";
 }
 
-closeButton.addEventListener("click", closeModal);
+function requestCloseModal() {
+  if (!confirmNavigationAway()) return;
+  closeModal();
+}
+
+closeButton.addEventListener("click", requestCloseModal);
 
 backdrop.addEventListener("click", (event) => {
-  if (event.target === backdrop) closeModal();
+  if (event.target === backdrop) requestCloseModal();
 });
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !backdrop.classList.contains("hidden")) {
-    closeModal();
+    requestCloseModal();
   }
 });

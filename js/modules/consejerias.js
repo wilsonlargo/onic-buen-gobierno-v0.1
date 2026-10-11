@@ -1,13 +1,13 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
-import { updateWithVersion } from "../security.js?v=5.2.0";
-import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
-import { renderConsejeriaWorkspace } from "./consejeriaWorkspace.js?v=5.2.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
+import { updateWithVersion } from "../security.js?v=5.3.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.3.0";
+import { renderConsejeriaWorkspace } from "./consejeriaWorkspace.js?v=5.3.0";
 import {
   getConsejeriaProgressMap,
   formatConsejeriaProgress,
   getConsejeriaProgressState
-} from "./consejeriaProgress.js?v=5.2.0";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
+} from "./consejeriaProgress.js?v=5.3.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.3.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -852,7 +852,7 @@ function openRetireDialog({ record, onSaved }) {
 
       <div class="form-actions">
         <button id="cancelRetire" class="btn btn-secondary" type="button">Cancelar</button>
-        <button id="confirmRetire" class="btn btn-danger" type="button">Retirar / Inactivar</button>
+        <button id="confirmRetire" class="btn btn-danger" type="button">Retirar de la Vigencia</button>
       </div>
 
       <p id="retireMessage" class="form-message"></p>
@@ -874,7 +874,7 @@ function openRetireDialog({ record, onSaved }) {
       console.error(error);
       message.textContent = friendlyErrorMessage(error, "No fue posible retirar la consejería.");
       button.disabled = false;
-      button.textContent = "Retirar / Inactivar";
+      button.textContent = "Retirar de la Vigencia";
     }
   });
 }

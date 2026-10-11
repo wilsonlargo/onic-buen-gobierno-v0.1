@@ -1,4 +1,4 @@
-import { requireSupabase } from "./supabaseClient.js?v=5.2.0";
+import { requireSupabase } from "./supabaseClient.js?v=5.3.0";
 
 let currentProfile = null;
 let currentAssignments = [];
@@ -75,7 +75,7 @@ export async function loadCurrentUserProfile(session) {
     const message = String(error.message || "").toLowerCase();
     if (message.includes("perfiles_usuario") || message.includes("schema cache")) {
       throw new Error(
-        "La seguridad multiusuario todavía no está habilitada. Solicita al Administrador que revise la configuración de acceso."
+        "No fue posible validar los permisos de acceso. Solicita al Administrador que revise tu cuenta."
       );
     }
     throw error;

@@ -1,7 +1,8 @@
 /*
- * Sistema de interfaz V5.2
- * Unifica iconografía, acciones, accesibilidad y pequeños comportamientos
- * sin alterar la lógica funcional de los módulos.
+ * Sistema de interfaz V5.3
+ * Unifica iconografía, acciones, accesibilidad, contexto de navegación,
+ * protección de cambios sin guardar y ayuda contextual sin alterar
+ * la lógica de negocio de los módulos.
  */
 
 const ICON_PATHS = {
@@ -42,7 +43,9 @@ const ICON_PATHS = {
   play: '<path d="m8 5 11 7-11 7V5z"></path>',
   filter: '<path d="M4 5h16l-6 7v6l-4 2v-8L4 5z"></path>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"></path>',
-  chevronDown: '<path d="m7 9 5 5 5-5"></path>'
+  chevronDown: '<path d="m7 9 5 5 5-5"></path>',
+  info: '<circle cx="12" cy="12" r="9"></circle><path d="M12 11v6"></path><path d="M12 7h.01"></path>',
+  compass: '<circle cx="12" cy="12" r="9"></circle><path d="m15.5 8.5-2 5-5 2 2-5 5-2z"></path>'
 };
 
 export function uiIcon(name, className = "ui-icon") {
@@ -57,8 +60,89 @@ const LABEL_NORMALIZATIONS = new Map([
   ["más acciones ▾", "Más acciones"]
 ]);
 
+const HELP_TERMS = [
+  ["ponderación", "Peso relativo que determina cuánto aporta un elemento al resultado del nivel superior."],
+  ["cobertura", "Porción de la estructura que ya cuenta con información suficiente para medir avance."],
+  ["línea base", "Valor inicial del indicador antes de registrar el avance."],
+  ["meta", "Valor que se espera alcanzar con el indicador."],
+  ["avance técnico", "Avance calculado a partir de los indicadores de las actividades."],
+  ["cumplimiento técnico", "Avance calculado a partir de los indicadores de las actividades."],
+  ["contribución", "Aporte ponderado del avance de este elemento al nivel superior."],
+  ["corte", "Fotografía del avance en una fecha determinada. Los cortes aprobados conservan el histórico."],
+  ["avance asociado", "Promedio del avance de los proyectos vinculados. No equivale por sí solo al cumplimiento político del Mandato."]
+];
+
+const CONTEXT_STORAGE_KEY = "onic_ui_context_v53";
+const VIEW_STORAGE_KEY = "onic_ui_view_context_v53";
+
+const CONTEXT_SELECTS = new Map([
+  ["inicioVigenciaSelector", "vigencia"],
+  ["vigenciaSelector", "vigencia"],
+  ["mandatosVigenciaSelector", "vigencia"],
+  ["lineasVigenciaSelector", "vigencia"],
+  ["programasVigenciaSelector", "vigencia"],
+  ["projectsVigenciaSelector", "vigencia"],
+  ["ponderacionVigenciaSelector", "vigencia"],
+  ["trackingVigenciaSelector", "vigencia"],
+  ["alertsVigenciaSelector", "vigencia"],
+  ["mandateTrackingVigencia", "vigencia"],
+  ["qualityVigencia", "vigencia"],
+  ["myWorkVigencia", "vigencia"],
+  ["historyVigencia", "vigencia"],
+  ["lineasConsejeriaSelector", "consejeria"],
+  ["programasConsejeriaSelector", "consejeria"],
+  ["projectsConsejeriaSelector", "consejeria"],
+  ["ponderacionConsejeriaSelector", "consejeria"],
+  ["alertsConsejeriaSelector", "consejeria"],
+  ["mandateTrackingConsejeria", "consejeria"],
+  ["qualityConsejeria", "consejeria"],
+  ["historyConsejeria", "consejeria"],
+  ["programasLineaSelector", "linea"],
+  ["projectsLineaSelector", "linea"],
+  ["projectsProgramaSelector", "programa"]
+]);
+
+const CONTEXT_KEYS = {
+  vigencia: { id: "vigencia_id", label: "vigencia_nombre" },
+  consejeria: { id: "vigencia_consejeria_id", label: "consejeria_nombre" },
+  linea: { id: "linea_id", label: "linea_nombre" },
+  programa: { id: "programa_id", label: "programa_nombre" },
+  proyecto: { id: "proyecto_id", label: "proyecto_nombre" }
+};
+
+const VIEW_CONTEXT_FIELDS = {
+  inicio: ["vigencia"],
+  mi_trabajo: ["vigencia"],
+  mandatos: ["vigencia"],
+  consejerias: ["vigencia"],
+  lineas: ["vigencia", "consejeria"],
+  programas: ["vigencia", "consejeria", "linea"],
+  proyectos: ["vigencia", "consejeria", "linea", "programa"],
+  ponderaciones: ["vigencia", "consejeria"],
+  seguimiento_mandatos: ["vigencia", "consejeria"],
+  cortes: ["vigencia"],
+  alertas: ["vigencia", "consejeria"],
+  calidad: ["vigencia", "consejeria"]
+};
+
+const dirtyForms = new Set();
+let interfaceView = { viewName: "inicio", title: "Inicio", root: document, navigationTarget: null };
+let observer = null;
+let timer = null;
+let bypassDirtyGuard = false;
+let toastTimer = null;
+
 function cleanText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function escapeHTML(value = "") {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function actionIcon(text, button) {
@@ -94,7 +178,6 @@ function normalizeSimpleButton(button) {
     button.dataset.uiEnhanced = "true";
     return;
   }
-  // Evita modificar tarjetas o botones ricos con contenido estructurado.
   if (button.children.length > 0) return;
 
   let text = cleanText(button.textContent);
@@ -109,17 +192,12 @@ function normalizeSimpleButton(button) {
   const mapped = LABEL_NORMALIZATIONS.get(text.toLocaleLowerCase("es"));
   if (mapped) text = mapped;
 
-  let iconName = actionIcon(text, button);
+  const iconName = actionIcon(text, button);
   if (!iconName) return;
 
   text = text.replace(/^\+\s*/, "").replace(/\s*[→▾]\s*$/, "").trim();
   const icon = uiIcon(iconName);
-
-  if (iconName === "forward" || iconName === "chevronDown") {
-    button.innerHTML = `<span class="ui-button-label">${text}</span>${icon}`;
-  } else {
-    button.innerHTML = `${icon}<span class="ui-button-label">${text}</span>`;
-  }
+  button.innerHTML = `${icon}<span class="ui-button-label">${escapeHTML(text)}</span>`;
   button.dataset.uiEnhanced = "true";
 }
 
@@ -131,7 +209,6 @@ function improveIconButton(button) {
   }
 }
 
-
 function refreshNavigationGroups(root) {
   const scope = root?.querySelectorAll ? root : document;
   scope.querySelectorAll(".nav-group").forEach((group) => {
@@ -140,7 +217,6 @@ function refreshNavigationGroups(root) {
     group.classList.toggle("nav-group-empty", !hasVisible);
   });
 }
-
 
 const TAB_GROUP_SELECTOR = ".project-workspace-tabs, .consejeria-workspace-tabs, .my-work-tabs, .alerts-tabs";
 
@@ -175,20 +251,17 @@ function enhanceTabs(root) {
       buttons[next].focus();
     });
 
-    group.addEventListener("click", () => {
-      setTimeout(() => refreshTabState(group), 0);
-    });
+    group.addEventListener("click", () => setTimeout(() => refreshTabState(group), 0));
   });
 }
-
 
 function enhanceLoadingStates(root) {
   root.querySelectorAll(".empty-state").forEach((state) => {
     if (state.dataset.uiLoadingEnhanced === "true" || state.children.length) return;
     const text = cleanText(state.textContent);
-    if (!/^(cargando|calculando|preparando)/i.test(text)) return;
+    if (!/^(cargando|calculando|preparando|actualizando)/i.test(text)) return;
     state.classList.add("inline-loading-state");
-    state.innerHTML = `<span class="loading-spinner" aria-hidden="true"></span><span>${text}</span>`;
+    state.innerHTML = `<span class="loading-spinner" aria-hidden="true"></span><span>${escapeHTML(text)}</span>`;
     state.dataset.uiLoadingEnhanced = "true";
   });
 }
@@ -199,6 +272,405 @@ function improveForms(root) {
   });
 }
 
+function helpTextFor(text) {
+  const normalized = cleanText(text).toLocaleLowerCase("es").replace(/[:*]/g, "");
+  for (const [term, help] of HELP_TERMS) {
+    if (normalized === term || normalized.startsWith(`${term} `)) return help;
+  }
+  return "";
+}
+
+function enhanceContextualHelp(root) {
+  root.querySelectorAll("label, .calculation-item > span, .workspace-metric > span, .project-summary-stat > span, .tracking-summary-card > span").forEach((label) => {
+    if (label.dataset.uiHelpEnhanced === "true") return;
+    const help = helpTextFor(label.textContent);
+    if (!help) return;
+    const dot = document.createElement("button");
+    dot.type = "button";
+    dot.className = "ui-help-dot";
+    dot.setAttribute("aria-label", `Ayuda: ${cleanText(label.textContent)}`);
+    dot.title = help;
+    dot.innerHTML = uiIcon("info", "ui-help-icon");
+    dot.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      showGlobalStatus(help, "info", 5200);
+    });
+    label.append(" ", dot);
+    label.dataset.uiHelpEnhanced = "true";
+  });
+}
+
+function enhanceEmptyStates(root) {
+  root.querySelectorAll(".empty-state").forEach((state) => {
+    if (state.dataset.uiEmptyEnhanced === "true") return;
+    const text = cleanText(state.textContent);
+    if (!text || /^(cargando|calculando|preparando|actualizando)/i.test(text)) return;
+    state.classList.add("guided-empty-state");
+    if (!state.querySelector(".empty-state-icon")) {
+      const icon = document.createElement("span");
+      icon.className = "empty-state-icon";
+      icon.innerHTML = uiIcon(/alerta|error|no fue posible/i.test(text) ? "alert" : "compass");
+      state.prepend(icon);
+    }
+
+    const lower = text.toLocaleLowerCase("es");
+    let view = null;
+    let label = null;
+    if (/módulo consejerías|vincula.*consejer/i.test(lower)) { view = "consejerias"; label = "Ir a Consejerías"; }
+    else if (/módulo líneas|líneas de acción/.test(lower) && /cré|primero|aún no/.test(lower)) { view = "lineas"; label = "Ir a Líneas de Acción"; }
+    else if (/módulo programas|no tiene programas|aún no tiene programas/.test(lower)) { view = "programas"; label = "Ir a Programas"; }
+    else if (/módulo proyectos|sin proyectos/.test(lower) && /primero|crear|aún/.test(lower)) { view = "proyectos"; label = "Ir a Proyectos"; }
+
+    if (view && !state.querySelector(".empty-state-action")) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "btn btn-secondary empty-state-action";
+      button.textContent = label;
+      button.addEventListener("click", () => {
+        window.dispatchEvent(new CustomEvent("app:navigate", { detail: { view } }));
+      });
+      state.append(button);
+    }
+    state.dataset.uiEmptyEnhanced = "true";
+  });
+}
+
+function enhanceTables(root) {
+  root.querySelectorAll("table.data-table").forEach((table) => {
+    if (table.dataset.uiTableEnhanced === "true") return;
+    const headers = [...table.querySelectorAll("thead th")].map((th) => cleanText(th.textContent));
+    table.querySelectorAll("tbody tr").forEach((row) => {
+      [...row.children].forEach((cell, index) => {
+        if (cell.tagName === "TD" && headers[index]) cell.dataset.label = headers[index];
+      });
+    });
+    if (headers.length >= 2 && headers.length <= 6) table.classList.add("mobile-card-table");
+    table.dataset.uiTableEnhanced = "true";
+  });
+}
+
+function readStoredContext() {
+  try {
+    return JSON.parse(sessionStorage.getItem(CONTEXT_STORAGE_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredContext(context) {
+  try { sessionStorage.setItem(CONTEXT_STORAGE_KEY, JSON.stringify(context || {})); } catch {}
+}
+
+function readViewContexts() {
+  try { return JSON.parse(sessionStorage.getItem(VIEW_STORAGE_KEY) || "{}") || {}; } catch { return {}; }
+}
+
+function writeViewContexts(contexts) {
+  try { sessionStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify(contexts || {})); } catch {}
+}
+
+function optionLabel(select) {
+  const option = select?.selectedOptions?.[0];
+  if (!option) return "";
+  return cleanText(option.textContent)
+    .replace(/\s*·\s*(activa|activo|inactiva|inactivo|archivada|archivado)$/i, "")
+    .replace(/^\d+\.\s*/, "");
+}
+
+function clearContextDescendants(context, level) {
+  const order = ["vigencia", "consejeria", "linea", "programa", "proyecto"];
+  const index = order.indexOf(level);
+  if (index < 0) return;
+  order.slice(index + 1).forEach((key) => delete context[key]);
+}
+
+function rememberSelectContext(select, { explicitClear = false } = {}) {
+  const level = CONTEXT_SELECTS.get(select?.id);
+  if (!level) return;
+  const context = readStoredContext();
+  const value = select.value || "";
+
+  if (!value) {
+    if (explicitClear) {
+      delete context[level];
+      clearContextDescendants(context, level);
+      writeStoredContext(context);
+    }
+    return;
+  }
+
+  context[level] = { id: value, label: optionLabel(select) || value };
+  clearContextDescendants(context, level);
+  writeStoredContext(context);
+}
+
+function scanContext(root) {
+  const scope = root?.querySelectorAll ? root : document;
+  scope.querySelectorAll("select[id]").forEach((select) => {
+    if (CONTEXT_SELECTS.has(select.id) && select.value) rememberSelectContext(select);
+  });
+}
+
+export function rememberNavigationTarget(target = null) {
+  if (!target || typeof target !== "object") return;
+  const context = readStoredContext();
+  const order = ["vigencia", "consejeria", "linea", "programa", "proyecto"];
+  let deepest = -1;
+  Object.entries(CONTEXT_KEYS).forEach(([level, keys]) => {
+    const id = target[keys.id];
+    if (!id) return;
+    const label = target[keys.label] || context[level]?.label || id;
+    context[level] = { id, label };
+    deepest = Math.max(deepest, order.indexOf(level));
+  });
+  if (deepest >= 0) {
+    order.slice(deepest + 1).forEach((level) => delete context[level]);
+  }
+  writeStoredContext(context);
+}
+
+function targetFromContext(viewName) {
+  const context = readStoredContext();
+  const allowed = VIEW_CONTEXT_FIELDS[viewName] || [];
+  const target = {};
+  allowed.forEach((level) => {
+    const item = context[level];
+    if (!item?.id) return;
+    const keys = CONTEXT_KEYS[level];
+    target[keys.id] = item.id;
+    if (item.label) target[keys.label] = item.label;
+  });
+  return target;
+}
+
+export function getContextualNavigationTarget(viewName, explicitTarget = null) {
+  if (explicitTarget && typeof explicitTarget === "object") {
+    rememberNavigationTarget(explicitTarget);
+    return explicitTarget;
+  }
+
+  const viewContexts = readViewContexts();
+  const own = viewContexts[viewName] || {};
+  const inherited = targetFromContext(viewName);
+  const result = { ...own, ...inherited };
+  return Object.keys(result).length ? result : null;
+}
+
+function persistViewContext(viewName) {
+  if (!viewName) return;
+  const target = targetFromContext(viewName);
+  if (!Object.keys(target).length) return;
+  const contexts = readViewContexts();
+  contexts[viewName] = target;
+  writeViewContexts(contexts);
+}
+
+function contextSegmentsForView(viewName) {
+  const context = readStoredContext();
+  const levels = VIEW_CONTEXT_FIELDS[viewName] || [];
+  return levels.map((level) => ({ level, ...(context[level] || {}) })).filter((item) => item.id && item.label);
+}
+
+function breadcrumbTargetFor(level, context) {
+  const base = {};
+  if (context.vigencia?.id) {
+    base.vigencia_id = context.vigencia.id;
+    base.vigencia_nombre = context.vigencia.label;
+  }
+  if (["consejeria", "linea", "programa"].includes(level) && context.consejeria?.id) {
+    base.vigencia_consejeria_id = context.consejeria.id;
+    base.consejeria_nombre = context.consejeria.label;
+  }
+  if (["linea", "programa"].includes(level) && context.linea?.id) {
+    base.linea_id = context.linea.id;
+    base.linea_nombre = context.linea.label;
+  }
+  if (level === "programa" && context.programa?.id) {
+    base.programa_id = context.programa.id;
+    base.programa_nombre = context.programa.label;
+  }
+  return base;
+}
+
+function breadcrumbViewFor(level) {
+  if (level === "vigencia") return "inicio";
+  if (level === "consejeria") return "lineas";
+  if (level === "linea") return "programas";
+  if (level === "programa") return "proyectos";
+  return "inicio";
+}
+
+function refreshContextBar({ scan = true } = {}) {
+  const bar = document.querySelector("#contextBar");
+  if (!bar) return;
+  const root = interfaceView.root || document;
+
+  if (root.querySelector?.(".project-workspace-breadcrumbs")) {
+    bar.classList.add("hidden");
+    bar.innerHTML = "";
+    return;
+  }
+
+  if (scan) scanContext(root);
+  const segments = contextSegmentsForView(interfaceView.viewName);
+  if (!segments.length) {
+    bar.classList.add("hidden");
+    bar.innerHTML = "";
+    return;
+  }
+
+  const context = readStoredContext();
+  bar.innerHTML = `
+    <span class="context-bar-label">Contexto</span>
+    <nav class="context-breadcrumbs" aria-label="Contexto de trabajo">
+      ${segments.map((segment, index) => `
+        ${index ? '<span class="context-separator" aria-hidden="true">›</span>' : ""}
+        <button type="button" class="context-crumb" data-context-level="${segment.level}" title="Abrir ${escapeHTML(segment.label)}">${escapeHTML(segment.label)}</button>
+      `).join("")}
+    </nav>
+  `;
+  bar.classList.remove("hidden");
+  bar.querySelectorAll("[data-context-level]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const level = button.dataset.contextLevel;
+      window.dispatchEvent(new CustomEvent("app:navigate", {
+        detail: {
+          view: breadcrumbViewFor(level),
+          target: breadcrumbTargetFor(level, context)
+        }
+      }));
+    });
+  });
+}
+
+export function setInterfaceView(viewName, title, root = document, navigationTarget = null) {
+  interfaceView = { viewName, title, root, navigationTarget };
+  rememberNavigationTarget(navigationTarget);
+  scanContext(root);
+  persistViewContext(viewName);
+  refreshContextBar();
+}
+
+function isMutationForm(form) {
+  if (!form || form.dataset.uiIgnoreDirty === "true") return false;
+  if (form.id === "loginForm") return false;
+  const submits = [...form.querySelectorAll('button[type="submit"], input[type="submit"]')];
+  if (!submits.length) return false;
+  return submits.some((button) => /guardar|crear|registrar|aprobar|vincular|actualizar|importar|marcar completado|ingresar datos/i.test(cleanText(button.textContent || button.value)));
+}
+
+function markFormDirty(form) {
+  if (!isMutationForm(form)) return;
+  form.dataset.uiDirty = "true";
+  dirtyForms.add(form);
+  updateDirtyIndicator();
+}
+
+function markFormClean(form) {
+  if (!form) return;
+  delete form.dataset.uiDirty;
+  dirtyForms.delete(form);
+  updateDirtyIndicator();
+}
+
+function cleanupDirtyForms() {
+  [...dirtyForms].forEach((form) => {
+    if (!form.isConnected) dirtyForms.delete(form);
+  });
+  updateDirtyIndicator();
+}
+
+export function hasUnsavedChanges() {
+  cleanupDirtyForms();
+  return [...dirtyForms].some((form) => form.isConnected && form.dataset.uiDirty === "true");
+}
+
+export function clearInterfaceDirtyState() {
+  [...dirtyForms].forEach(markFormClean);
+  dirtyForms.clear();
+  updateDirtyIndicator();
+}
+
+export function confirmNavigationAway() {
+  if (bypassDirtyGuard || !hasUnsavedChanges()) return true;
+  const confirmed = window.confirm("Hay cambios sin guardar. Si continúas, esos cambios se perderán. ¿Deseas salir de esta pantalla?");
+  if (confirmed) clearInterfaceDirtyState();
+  return confirmed;
+}
+
+function updateDirtyIndicator() {
+  const indicator = document.querySelector("#unsavedChangesIndicator");
+  if (!indicator) return;
+  const dirty = [...dirtyForms].some((form) => form.isConnected && form.dataset.uiDirty === "true");
+  indicator.classList.toggle("hidden", !dirty);
+  indicator.setAttribute("aria-hidden", String(!dirty));
+}
+
+export function showGlobalStatus(message, type = "success", duration = 3200) {
+  const toast = document.querySelector("#globalStatusToast");
+  if (!toast) return;
+  clearTimeout(toastTimer);
+  toast.className = `global-status-toast ${type}`;
+  toast.innerHTML = `${uiIcon(type === "success" ? "check" : type === "info" ? "info" : "alert")}<span>${escapeHTML(message)}</span>`;
+  toast.classList.remove("hidden");
+  toastTimer = setTimeout(() => toast.classList.add("hidden"), duration);
+}
+
+function handleFormSubmit(event) {
+  const form = event.target;
+  if (!(form instanceof HTMLFormElement) || !dirtyForms.has(form)) return;
+  form.dataset.uiSavePending = "true";
+  setTimeout(() => {
+    if (!form.isConnected && form.dataset.uiCancelled !== "true") {
+      dirtyForms.delete(form);
+      updateDirtyIndicator();
+      const hasVisibleModuleToast = [...document.querySelectorAll(".app-toast")]
+        .some((toast) => !toast.classList.contains("hidden") && cleanText(toast.textContent));
+      if (!hasVisibleModuleToast) showGlobalStatus("Cambios guardados.", "success", 2400);
+    }
+  }, 650);
+}
+
+function handleDocumentChange(event) {
+  const target = event.target;
+  if (target instanceof HTMLSelectElement && CONTEXT_SELECTS.has(target.id)) {
+    rememberSelectContext(target, { explicitClear: true });
+    persistViewContext(interfaceView.viewName);
+    // No volver a escanear inmediatamente: los selectores dependientes todavía pueden
+    // conservar el valor anterior hasta que el módulo procese el cambio.
+    refreshContextBar({ scan: false });
+  }
+
+  const form = target?.closest?.("form");
+  if (form && !target.matches('[type="search"]')) markFormDirty(form);
+}
+
+function handlePotentialNavigation(event) {
+  if (bypassDirtyGuard || !hasUnsavedChanges()) return;
+  const control = event.target?.closest?.(
+    ".nav-item, [data-project-tab], [data-activity-tab], .workspace-back-button, #modalClose, .my-work-tabs button, .alerts-tabs button"
+  );
+  if (!control) return;
+  const activeForm = event.target?.closest?.("form");
+  if (activeForm && dirtyForms.has(activeForm)) return;
+  if (!confirmNavigationAway()) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+}
+
+function handleCancelClick(event) {
+  const button = event.target?.closest?.("button");
+  if (!button) return;
+  const text = cleanText(button.textContent).toLocaleLowerCase("es");
+  if (!/cancelar|cerrar|descartar/.test(text)) return;
+  const form = button.closest("form") || document.querySelector("#modalBody form[data-ui-dirty='true']");
+  if (!form) return;
+  form.dataset.uiCancelled = "true";
+  markFormClean(form);
+}
+
 export function enhanceUserInterface(root = document) {
   if (!root?.querySelectorAll) return;
   root.querySelectorAll("button").forEach((button) => {
@@ -207,20 +679,38 @@ export function enhanceUserInterface(root = document) {
   });
   improveForms(root);
   enhanceLoadingStates(root);
+  enhanceEmptyStates(root);
   enhanceTabs(root);
+  enhanceContextualHelp(root);
+  enhanceTables(root);
   refreshNavigationGroups(root);
+  scanContext(root);
+  if (root === interfaceView.root || root.contains?.(interfaceView.root)) refreshContextBar();
 }
-
-let observer = null;
-let timer = null;
 
 export function initUserInterface() {
   enhanceUserInterface(document);
+
+  document.addEventListener("input", handleDocumentChange, true);
+  document.addEventListener("change", handleDocumentChange, true);
+  document.addEventListener("submit", handleFormSubmit, true);
+  document.addEventListener("click", handleCancelClick, true);
+  document.addEventListener("click", handlePotentialNavigation, true);
+
+  window.addEventListener("beforeunload", (event) => {
+    if (!hasUnsavedChanges()) return;
+    event.preventDefault();
+    event.returnValue = "";
+  });
+
   if (observer) observer.disconnect();
   observer = new MutationObserver((mutations) => {
-    if (!mutations.some((m) => m.addedNodes?.length)) return;
+    if (!mutations.some((m) => m.addedNodes?.length || m.removedNodes?.length)) return;
     clearTimeout(timer);
-    timer = setTimeout(() => enhanceUserInterface(document), 0);
+    timer = setTimeout(() => {
+      cleanupDirtyForms();
+      enhanceUserInterface(document);
+    }, 0);
   });
   observer.observe(document.body, { childList: true, subtree: true });
 }

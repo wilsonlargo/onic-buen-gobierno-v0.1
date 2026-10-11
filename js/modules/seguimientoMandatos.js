@@ -1,6 +1,6 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.2.0";
-import { isConsejeriaUser } from "../security.js?v=5.2.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.3.0";
+import { isConsejeriaUser } from "../security.js?v=5.3.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -367,7 +367,7 @@ function projectCard(metric) {
         <span class="status-chip ${state.className}">${escapeHTML(state.label)}</span>
       </div>
       <div class="mandate-project-action">
-        <button class="text-button open-linked-project" type="button" data-project-id="${metric.project.id}">Abrir Proyecto →</button>
+        <button class="text-button open-linked-project" type="button" data-project-id="${metric.project.id}">Abrir proyecto</button>
       </div>
     </article>
   `;

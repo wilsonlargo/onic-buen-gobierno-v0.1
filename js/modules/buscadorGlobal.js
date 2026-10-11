@@ -1,6 +1,6 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
-import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
-import { uiIcon } from "../components/uiSystem.js?v=5.2.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.3.0";
+import { uiIcon } from "../components/uiSystem.js?v=5.3.0";
 
 let cachedIndex = null;
 let cachedAt = 0;
@@ -339,7 +339,7 @@ export function initGlobalSearch({ onNavigate } = {}) {
             ${item.subtitle ? `<small>${escapeHTML(item.subtitle)}</small>` : ""}
             ${item.route ? `<em>${escapeHTML(item.route)}</em>` : ""}
           </span>
-          <span class="global-search-open">Abrir →</span>
+          <span class="global-search-open">Abrir ${uiIcon("forward", "ui-icon global-search-open-icon")}</span>
         </button>
       `).join("");
       resultsHost.querySelectorAll("[data-result-index]").forEach((element) => {

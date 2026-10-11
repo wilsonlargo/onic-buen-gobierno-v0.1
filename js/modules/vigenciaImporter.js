@@ -1,7 +1,8 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
-import { logManualEvent } from "../security.js?v=5.2.0";
-import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
+import { logManualEvent } from "../security.js?v=5.3.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.3.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.3.0";
+import { uiIcon } from "../components/uiSystem.js?v=5.3.0";
 
 const SUPPORTED_SCHEMA = "onic-buen-gobierno.v1";
 const MAX_FILE_BYTES = 12 * 1024 * 1024;
@@ -753,7 +754,7 @@ export function openVigenciaImportDialog({
           type="button"
           disabled
         >
-          Importar Vigencia
+          Importar vigencia
         </button>
       </div>
     `
@@ -1178,7 +1179,7 @@ export function openVigenciaImportDialog({
           content: `
             <div class="json-import-success">
               <span class="json-import-success-icon">
-                ✓
+                ${uiIcon("check")}
               </span>
 
               <div>
@@ -1288,7 +1289,7 @@ export function openVigenciaImportDialog({
 
         executeButton.disabled = false;
         executeButton.textContent =
-          "Importar Vigencia";
+          "Importar vigencia";
       }
     }
   );

@@ -1,10 +1,10 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
-import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
-import { openVigenciaImportDialog } from "./vigenciaImporter.js?v=5.2.0";
-import { openForceDeleteVigenciaDialog } from "./vigenciaForceDelete.js?v=5.2.0";
-import { openVigenciaBackupDialog } from "./vigenciaBackup.js?v=5.2.0";
-import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.2.0";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.3.0";
+import { openVigenciaImportDialog } from "./vigenciaImporter.js?v=5.3.0";
+import { openForceDeleteVigenciaDialog } from "./vigenciaForceDelete.js?v=5.3.0";
+import { openVigenciaBackupDialog } from "./vigenciaBackup.js?v=5.3.0";
+import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.3.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.3.0";
 
 function escapeHTML(value = "") {
   return String(value)

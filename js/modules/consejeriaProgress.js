@@ -1,4 +1,4 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
 
 function clamp(value, min = 0, max = 100) {
   return Math.min(

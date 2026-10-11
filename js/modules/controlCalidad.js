@@ -1,5 +1,6 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
-import { setAuditContext } from "./auditoria.js?v=5.2.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
+import { setAuditContext } from "./auditoria.js?v=5.3.0";
+import { uiIcon } from "../components/uiSystem.js?v=5.3.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -334,7 +335,7 @@ export async function renderControlCalidad(container, navigationTarget = null) {
     body.innerHTML = visible.map((row) => {
       const findings = row.findings.length
         ? `<ul class="quality-findings">${row.findings.map((item) => `<li>${escapeHTML(item.label)}</li>`).join("")}</ul>`
-        : `<p class="quality-ok-message">✓ La estructura mínima está completa.</p>`;
+        : `<p class="quality-ok-message">${uiIcon("check", "ui-icon quality-status-icon")}<span>La estructura mínima está completa.</span></p>`;
       return `
         <article class="quality-project-card ${row.state.className}" data-project-id="${row.project.id}">
           <div class="quality-project-header">
@@ -355,12 +356,12 @@ export async function renderControlCalidad(container, navigationTarget = null) {
               ${findings}
             </div>
             <div class="quality-check-grid">
-              ${row.checks.map((check) => `<span class="quality-check ${check.ok ? "ok" : "missing"}">${check.ok ? "✓" : "!"} ${escapeHTML(check.label)}</span>`).join("")}
+              ${row.checks.map((check) => `<span class="quality-check ${check.ok ? "ok" : "missing"}">${uiIcon(check.ok ? "check" : "alert", "ui-icon quality-status-icon")}<span>${escapeHTML(check.label)}</span></span>`).join("")}
             </div>
           </div>
           <div class="quality-project-actions">
             <span class="muted">Mandatos relacionados: ${row.mandateCount}</span>
-            <button class="btn btn-secondary quality-open" type="button">Abrir Proyecto</button>
+            <button class="btn btn-secondary quality-open" type="button">Abrir proyecto</button>
           </div>
         </article>
       `;

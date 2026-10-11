@@ -1,7 +1,7 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
-import { updateWithVersion } from "../security.js?v=5.2.0";
-import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
+import { updateWithVersion } from "../security.js?v=5.3.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.3.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.3.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -1424,7 +1424,7 @@ async function copyMandatosToClipboard(rows) {
 }
 
 
-export async function renderMandatos(container) {
+export async function renderMandatos(container, navigationTarget = null) {
   let vigencias = [];
   let selectedVigenciaId = "";
   let fuentes = [];
@@ -1482,7 +1482,7 @@ export async function renderMandatos(container) {
         <div class="inline-control">
           <select id="mandatosVigenciaSelector" aria-label="Seleccionar vigencia"></select>
           <button id="newFuenteButton" class="btn btn-secondary" type="button">
-            + Fuente
+            + Nueva fuente
           </button>
         </div>
       </div>
@@ -1592,8 +1592,9 @@ export async function renderMandatos(container) {
 
     if (!selectedVigenciaId && vigencias.length) {
       selectedVigenciaId =
-        vigencias.find((v) => v.estado === "activa")?.id ||
-        vigencias[0].id;
+        navigationTarget?.vigencia_id && vigencias.some((v) => v.id === navigationTarget.vigencia_id)
+          ? navigationTarget.vigencia_id
+          : vigencias.find((v) => v.estado === "activa")?.id || vigencias[0].id;
     }
 
     selector.innerHTML = vigencias.length

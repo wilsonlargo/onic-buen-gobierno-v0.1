@@ -1,8 +1,8 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
-import { updateWithVersion } from "../security.js?v=5.2.0";
-import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.2.0";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
+import { updateWithVersion } from "../security.js?v=5.3.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.3.0";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.3.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.3.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -233,7 +233,7 @@ function openLineaForm({
   const consejeria = vigenciaConsejeria.consejerias;
 
   openModal({
-    title: editing ? "Editar Línea de Acción" : "Nueva Línea de Acción",
+    title: editing ? "Editar línea de acción" : "Nueva línea de acción",
     content: `
       <div class="context-ribbon">
         <div>
@@ -1081,7 +1081,7 @@ export async function renderLineas(container, navigationTarget = null) {
         </button>
 
         <button id="newLineaButton" class="btn btn-primary" type="button" disabled>
-          + Nueva Línea
+          + Nueva línea de acción
         </button>
       </div>
     </div>
@@ -1354,7 +1354,7 @@ export async function renderLineas(container, navigationTarget = null) {
         <div class="empty-state">
           <strong>Esta Consejería aún no tiene Líneas de Acción.</strong>
           <p>
-            Usa <strong>+ Nueva Línea</strong> para crear la primera o
+            Usa <strong>+ Nueva línea de acción</strong> para crear la primera o
             <strong>Importar</strong> para cargar varias.
           </p>
         </div>
@@ -1428,7 +1428,7 @@ export async function renderLineas(container, navigationTarget = null) {
                 </div>
 
                 <div class="calculation-item">
-                  <span>Cumplimiento</span>
+                  <span>Avance técnico</span>
                   <strong>—</strong>
                   <small>${programas ? "Se calculará desde Programas" : "Sin Programas"}</small>
                 </div>

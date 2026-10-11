@@ -1,13 +1,13 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
 import {
   canManageGlobalStructure,
   getCurrentProfile,
   isReadOnlyUser,
   updateWithVersion
-} from "../security.js?v=5.2.0";
-import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
-import { setAuditContext } from "./auditoria.js?v=5.2.0";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
+} from "../security.js?v=5.3.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.3.0";
+import { setAuditContext } from "./auditoria.js?v=5.3.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.3.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -492,7 +492,7 @@ function buildAlerts(vigencia, data) {
         key: `actividad_vencida:${activity.id}`,
         type: "actividad_vencida",
         severity: "alta",
-        title: "Actividad vencida con cumplimiento pendiente",
+        title: "Actividad vencida con avance pendiente",
         description: `La Actividad finalizó el ${formatDate(activity.fecha_fin)} y registra ${progress === null ? "avance sin medición completa" : formatPercent(progress)}.`,
         vigenciaConsejeriaId: ctx.vc?.id || null,
         entityType: "actividad",
@@ -1039,7 +1039,7 @@ export async function renderAlertasTareas(container, navigationTarget = null, op
             <p>${escapeHTML(item.description)}</p>
             <div class="alert-route">${escapeHTML(item.route || "")}</div>
             <div class="alert-card-actions">
-              ${item.navigation?.view ? `<button class="text-button go-alert-reference" type="button" data-key="${escapeHTML(item.key)}">Ir a referencia →</button>` : ""}
+              ${item.navigation?.view ? `<button class="text-button go-alert-reference" type="button" data-key="${escapeHTML(item.key)}">Ir a referencia</button>` : ""}
               ${readOnly || item.taskId ? "" : existingTask
                 ? `<button class="text-button show-alert-task" type="button" data-task-id="${existingTask.id}">Compromiso en curso</button>`
                 : `<button class="btn btn-secondary create-alert-task" type="button" data-key="${escapeHTML(item.key)}">Crear compromiso</button>`}
@@ -1122,7 +1122,7 @@ export async function renderAlertasTareas(container, navigationTarget = null, op
             ${task.ruta ? `<div class="alert-route">${escapeHTML(task.ruta)}</div>` : ""}
             ${task.resultado_cierre ? `<div class="task-result"><span>Resultado / cierre</span><p>${escapeHTML(task.resultado_cierre)}</p></div>` : ""}
             <div class="task-card-actions">
-              ${normalizeNavigation(task.navigation)?.view ? `<button class="text-button go-task-reference" type="button" data-id="${task.id}">Ir a referencia →</button>` : ""}
+              ${normalizeNavigation(task.navigation)?.view ? `<button class="text-button go-task-reference" type="button" data-id="${task.id}">Ir a referencia</button>` : ""}
               ${readOnly ? "" : `<button class="text-button edit-task" type="button" data-id="${task.id}">Editar</button>`}
               ${readOnly || task.estado !== "pendiente" ? "" : `<button class="btn btn-secondary start-task" type="button" data-id="${task.id}">Iniciar</button>`}
               ${readOnly || !["pendiente", "en_proceso"].includes(task.estado) ? "" : `<button class="btn btn-primary complete-task" type="button" data-id="${task.id}">Completar</button>`}

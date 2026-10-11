@@ -1,7 +1,7 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
-import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
-import { updateWithVersion } from "../security.js?v=5.2.0";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.3.0";
+import { updateWithVersion } from "../security.js?v=5.3.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.3.0";
 
 let currentContext = null;
 let initialized = false;
@@ -309,7 +309,7 @@ function renderPanel() {
         </div>
         <div class="audit-note-actions">
           <button class="text-button edit-audit-note" type="button" data-id="${note.id}">Revisar nota</button>
-          <button class="text-button go-audit-reference" type="button" data-id="${note.id}">Ir a referencia →</button>
+          <button class="text-button go-audit-reference" type="button" data-id="${note.id}">Ir a referencia</button>
         </div>
       </article>
     `;

@@ -1,3 +1,4 @@
+import { uiIcon } from "../components/uiSystem.js?v=5.3.0";
 const COLOR_OPTIONS = [
   { value: "", label: "Automático", hex: "#4f7f67" },
   { value: "verde", label: "Verde", hex: "#4f7f67" },
@@ -199,7 +200,7 @@ function quickLinksHTML(activity, counts, budget) {
       <button class="planner-link" type="button" data-open-tab="indicadores" data-id="${activity.id}"><span>Indicadores</span><strong>${counts.indicators}</strong></button>
       <button class="planner-link" type="button" data-open-tab="evidencias" data-id="${activity.id}"><span>Evidencias</span><strong>${counts.evidence}</strong></button>
       <button class="planner-link planner-link-wide" type="button" data-open-tab="presupuesto" data-id="${activity.id}"><span>Presupuesto</span><strong>${formatMoney(budget.programmed)}</strong></button>
-      <button class="planner-link" type="button" data-open-tab="seguimiento" data-id="${activity.id}"><span>Seguimiento</span><strong>→</strong></button>
+      <button class="planner-link" type="button" data-open-tab="seguimiento" data-id="${activity.id}"><span>Seguimiento</span><strong>${uiIcon("forward")}</strong></button>
     </div>`;
 }
 

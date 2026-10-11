@@ -1,10 +1,10 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
-import { updateWithVersion, logManualEvent } from "../security.js?v=5.2.0";
-import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.2.0";
-import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.2.0";
-import { renderProjectPlanner, plannerColorOptions, exportProjectPlanner } from "./projectPlanner.js?v=5.2.0";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
+import { updateWithVersion, logManualEvent } from "../security.js?v=5.3.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.3.0";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.3.0";
+import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.3.0";
+import { renderProjectPlanner, plannerColorOptions, exportProjectPlanner } from "./projectPlanner.js?v=5.3.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.3.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -785,7 +785,7 @@ export async function renderProyectoWorkspace(container, options) {
       </div>
       <div class="workspace-metrics">
         <div class="workspace-metric"><span>Ponderación</span><strong>${formatPercent(project.ponderacion)}</strong><small>Dentro del Programa</small></div>
-        <div class="workspace-metric"><span>Cumplimiento técnico</span><strong>${formatPercent(metrics.technicalProgress)}</strong><small>${metrics.includedCount ? `${metrics.measurableCount}/${metrics.includedCount} actividades medibles` : "Sin actividades"}</small></div>
+        <div class="workspace-metric"><span>Avance técnico</span><strong>${formatPercent(metrics.technicalProgress)}</strong><small>${metrics.includedCount ? `${metrics.measurableCount}/${metrics.includedCount} actividades medibles` : "Sin actividades"}</small></div>
         <div class="workspace-metric"><span>Contribución</span><strong>${formatPercent(contribution)}</strong><small>Al Programa</small></div>
         <div class="workspace-metric"><span>Presupuesto detallado</span><strong>${detailedBudget !== null ? formatMoney(detailedBudget) : formatMoney(project.valor_estimado)}</strong><small>${detailedBudget !== null ? "Suma de actividades" : "Estimación del perfil"}</small></div>
         <div class="workspace-metric"><span>Ejecución presupuestal</span><strong>${formatPercent(metrics.budget.execution)}</strong><small>${formatMoney(metrics.budget.executed)} ejecutado</small></div>
@@ -815,7 +815,7 @@ export async function renderProyectoWorkspace(container, options) {
   function renderShell() {
     container.innerHTML = `
       <section class="project-workspace">
-        <button id="backToProjects" class="workspace-back-button" type="button">${arrowIcon()} Volver a Proyectos</button>
+        <button id="backToProjects" class="workspace-back-button" type="button">${arrowIcon()} Volver a proyectos</button>
         <header class="project-workspace-header">${headerHTML()}</header>
         ${projectNavigationHTML()}
         <div id="projectWorkspaceBody"></div>
@@ -902,7 +902,7 @@ export async function renderProyectoWorkspace(container, options) {
             <div class="form-field"><label>Valor estimado del perfil (COP)</label><input id="profileEstimatedValue" name="valor_estimado" type="number" min="0" step="0.01" value="${project.valor_estimado ?? ""}"></div>
           </div>
         </section>
-        <div class="workspace-form-footer"><p id="profileMessage" class="form-message"></p><button class="btn btn-primary" type="submit">Guardar Perfil</button></div>
+        <div class="workspace-form-footer"><p id="profileMessage" class="form-message"></p><button class="btn btn-primary" type="submit">Guardar perfil</button></div>
       </form>`;
 
     const form = body.querySelector("#projectProfileForm");
@@ -947,7 +947,7 @@ export async function renderProyectoWorkspace(container, options) {
         console.error(error);
         message.textContent = friendlyErrorMessage(error, "No fue posible guardar el Perfil.");
         submit.disabled = false;
-        submit.textContent = "Guardar Perfil";
+        submit.textContent = "Guardar perfil";
       }
     });
   }
@@ -1212,7 +1212,7 @@ export async function renderProyectoWorkspace(container, options) {
               <p class="muted activity-work-description">${escapeHTML(activity.descripcion || "Sin descripción registrada.")}</p>
               <div class="activity-work-metrics">
                 <div><span>Peso técnico</span><strong>${formatPercent(weight)}</strong><small>Automático</small></div>
-                <div><span>Cumplimiento</span><strong>${formatPercent(progress)}</strong><small>${activityIndicators.filter((i) => i.estado === "activo").length} indicadores</small></div>
+                <div><span>Avance técnico</span><strong>${formatPercent(progress)}</strong><small>${activityIndicators.filter((i) => i.estado === "activo").length} indicadores</small></div>
                 <div><span>Presupuesto</span><strong>${formatMoney(budgetMetric.programmed)}</strong><small>${formatPercent(budgetMetric.execution)} ejecutado</small></div>
                 <div><span>Evidencias</span><strong>${evidenceCount}</strong><small>Activas</small></div>
               </div>
@@ -1281,7 +1281,7 @@ export async function renderProyectoWorkspace(container, options) {
       <section class="workspace-section workspace-section-flush">
         <div class="workspace-section-heading"><div><p class="eyebrow">Consolidado</p><h3>Seguimiento del Proyecto</h3><p class="muted">El avance técnico proviene de los indicadores de las Actividades. La ejecución financiera se presenta por separado.</p></div></div>
         <div class="tracking-summary-grid">
-          <div class="tracking-summary-card"><span>Cumplimiento técnico</span><strong>${formatPercent(metrics.technicalProgress)}</strong><small>${metrics.includedCount ? `${metrics.measurableCount} de ${metrics.includedCount} actividades medibles` : "Sin actividades"}</small></div>
+          <div class="tracking-summary-card"><span>Avance técnico</span><strong>${formatPercent(metrics.technicalProgress)}</strong><small>${metrics.includedCount ? `${metrics.measurableCount} de ${metrics.includedCount} actividades medibles` : "Sin actividades"}</small></div>
           <div class="tracking-summary-card"><span>Presupuesto programado</span><strong>${formatMoney(metrics.budget.programmed)}</strong><small>Suma de rubros activos</small></div>
           <div class="tracking-summary-card"><span>Presupuesto ejecutado</span><strong>${formatMoney(metrics.budget.executed)}</strong><small>${formatPercent(metrics.budget.execution)}</small></div>
           <div class="tracking-summary-card"><span>Contribución al Programa</span><strong>${metrics.technicalProgress === null ? "—" : formatPercent(metrics.technicalProgress * Number(project.ponderacion || 0) / 100)}</strong><small>Ponderación del Proyecto: ${formatPercent(project.ponderacion)}</small></div>
@@ -1293,7 +1293,7 @@ export async function renderProyectoWorkspace(container, options) {
             return `<div class="tracking-activity-row"><div><strong>${escapeHTML(activity.codigo || activity.nombre)}</strong><span>${escapeHTML(activity.nombre)}</span></div><div class="progress-track"><span class="progress-fill" style="width:${progress === null ? 0 : Math.min(100, Math.max(0, progress))}%"></span></div><strong>${formatPercent(progress)}</strong><small>Peso ${formatPercent(weight)}</small></div>`;
           }).join("") : `<div class="empty-inline">No hay actividades activas para consolidar.</div>`}
         </div>
-        ${metrics.technicalProgress === null && metrics.includedCount > 0 ? `<div class="calculation-note"><strong>El cumplimiento aún no es calculable</strong><p>Para evitar un porcentaje engañoso, el sistema solo calcula el cumplimiento del Proyecto cuando todas las actividades no canceladas tienen al menos un indicador activo con una meta válida.</p></div>` : ""}
+        ${metrics.technicalProgress === null && metrics.includedCount > 0 ? `<div class="calculation-note"><strong>El avance aún no es calculable</strong><p>Para evitar un porcentaje engañoso, el sistema solo calcula el avance del Proyecto cuando todas las actividades no canceladas tienen al menos un indicador activo con una meta válida.</p></div>` : ""}
       </section>`;
   }
 
@@ -1393,7 +1393,7 @@ export async function renderProyectoWorkspace(container, options) {
       <div class="project-workspace-title-row"><div><p class="eyebrow">${escapeHTML(activity.codigo || "Actividad")}</p><h2>${escapeHTML(activity.nombre)}</h2></div>${activityStatusChip(activity.estado)}</div>
       <div class="workspace-metrics">
         <div class="workspace-metric"><span>Peso técnico</span><strong>${formatPercent(weight)}</strong><small>Automático dentro del Proyecto</small></div>
-        <div class="workspace-metric"><span>Cumplimiento</span><strong>${formatPercent(progress)}</strong><small>${activityIndicators.filter((i) => i.estado === "activo").length} indicadores activos</small></div>
+        <div class="workspace-metric"><span>Avance técnico</span><strong>${formatPercent(progress)}</strong><small>${activityIndicators.filter((i) => i.estado === "activo").length} indicadores activos</small></div>
         <div class="workspace-metric"><span>Presupuesto</span><strong>${formatMoney(budget.programmed)}</strong><small>Programado</small></div>
         <div class="workspace-metric"><span>Ejecución</span><strong>${formatPercent(budget.execution)}</strong><small>${formatMoney(budget.executed)} ejecutado</small></div>
         <div class="workspace-metric"><span>Evidencias</span><strong>${evidenceForActivity(activity.id).filter((e) => e.estado === "activa").length}</strong><small>Activas</small></div>
@@ -1410,7 +1410,7 @@ export async function renderProyectoWorkspace(container, options) {
     if (!activity) { currentActivityId = null; projectTab = activityReturnTab; renderShell(); return; }
     container.innerHTML = `
       <section class="project-workspace activity-workspace">
-        <button id="backToProjectActivities" class="workspace-back-button" type="button">${arrowIcon()} Volver al Proyecto</button>
+        <button id="backToProjectActivities" class="workspace-back-button" type="button">${arrowIcon()} Volver al proyecto</button>
         <header class="project-workspace-header">${activityHeaderHTML(activity)}</header>
         ${activityNavHTML()}
         <div id="activityWorkspaceBody"></div>
@@ -1531,7 +1531,7 @@ export async function renderProyectoWorkspace(container, options) {
     const rows = indicatorsForActivity(activity.id);
     body.innerHTML = `
       <section class="workspace-section workspace-section-flush">
-        <div class="workspace-section-heading"><div><p class="eyebrow">Medición</p><h3>Indicadores de la actividad</h3><p class="muted">El cumplimiento de la actividad se calcula automáticamente con los indicadores activos.</p></div><button id="newIndicatorButton" class="btn btn-primary" type="button">+ Nuevo indicador</button></div>
+        <div class="workspace-section-heading"><div><p class="eyebrow">Medición</p><h3>Indicadores de la actividad</h3><p class="muted">El avance de la actividad se calcula automáticamente con los indicadores activos.</p></div><button id="newIndicatorButton" class="btn btn-primary" type="button">+ Nuevo indicador</button></div>
         ${rows.length ? `<div class="indicator-card-list">${rows.map((indicator) => {
           const progress = calculateIndicatorProgress(indicator);
           return `<article id="audit-indicator-${indicator.id}" class="indicator-work-card ${indicator.estado === "inactivo" ? "is-inactive" : ""}">
@@ -1541,12 +1541,12 @@ export async function renderProyectoWorkspace(container, options) {
               <div><span>Meta</span><strong>${formatNumber(indicator.meta, 4)}</strong></div>
               <div><span>Alcanzado</span><strong>${formatNumber(indicator.valor_actual, 4)}</strong></div>
               <div><span>Unidad</span><strong>${escapeHTML(indicator.unidad_medida || "—")}</strong></div>
-              <div><span>Cumplimiento</span><strong>${formatPercent(progress)}</strong></div>
+              <div><span>Avance técnico</span><strong>${formatPercent(progress)}</strong></div>
             </div>
             <div class="progress-track large"><span class="progress-fill" style="width:${progress === null ? 0 : progress}%"></span></div>
             <div class="entity-actions"><button class="btn btn-primary indicator-followup" type="button" data-id="${indicator.id}">Registrar avance</button><button class="btn btn-secondary audit-indicator-note" type="button" data-id="${indicator.id}">Nota</button><button class="btn btn-secondary edit-indicator" type="button" data-id="${indicator.id}">Editar</button><button class="icon-btn danger delete-indicator" type="button" data-id="${indicator.id}" title="Eliminar indicador">${trashIcon()}</button></div>
           </article>`;
-        }).join("")}</div>` : `<div class="empty-state workspace-empty"><strong>Esta actividad todavía no tiene indicadores.</strong><p>Sin indicadores el sistema no calcula cumplimiento técnico.</p></div>`}
+        }).join("")}</div>` : `<div class="empty-state workspace-empty"><strong>Esta actividad todavía no tiene indicadores.</strong><p>Sin indicadores el sistema no calcula avance técnico.</p></div>`}
       </section>`;
 
     body.querySelector("#newIndicatorButton").addEventListener("click", () => {
@@ -1603,7 +1603,7 @@ export async function renderProyectoWorkspace(container, options) {
     const metrics = calculateBudgetMetrics(rows);
     body.innerHTML = `
       <section class="workspace-section workspace-section-flush">
-        <div class="workspace-section-heading"><div><p class="eyebrow">Finanzas</p><h3>Presupuesto de la actividad</h3><p class="muted">El presupuesto se controla de forma independiente al cumplimiento técnico.</p></div><button id="newBudgetButton" class="btn btn-primary" type="button">+ Nuevo rubro</button></div>
+        <div class="workspace-section-heading"><div><p class="eyebrow">Finanzas</p><h3>Presupuesto de la actividad</h3><p class="muted">El presupuesto se controla de forma independiente al avance técnico.</p></div><button id="newBudgetButton" class="btn btn-primary" type="button">+ Nuevo rubro</button></div>
         <div class="tracking-summary-grid budget-summary-grid"><div class="tracking-summary-card"><span>Programado</span><strong>${formatMoney(metrics.programmed)}</strong></div><div class="tracking-summary-card"><span>Ejecutado</span><strong>${formatMoney(metrics.executed)}</strong></div><div class="tracking-summary-card"><span>Ejecución presupuestal</span><strong>${formatPercent(metrics.execution)}</strong></div></div>
         ${rows.length ? `<div class="table-wrap"><table class="data-table workspace-data-table"><thead><tr><th>Rubro</th><th>Programado</th><th>Ejecutado</th><th>Ejecución</th><th>Estado</th><th></th></tr></thead><tbody>${rows.map((item) => {
           const execution = Number(item.programado || 0) > 0 ? Math.min(100, Number(item.ejecutado || 0) / Number(item.programado || 0) * 100) : null;
@@ -1773,7 +1773,7 @@ export async function renderProyectoWorkspace(container, options) {
     }
   } catch (error) {
     console.error(error);
-    container.innerHTML = `<section class="panel" style="margin-top:0"><p class="eyebrow">Proyecto</p><h2>No fue posible abrir el espacio de trabajo</h2><p class="muted">${escapeHTML(friendlyErrorMessage(error, "No fue posible cargar la información del Proyecto. Intenta nuevamente o informa al administrador del Sistema."))}</p><div style="margin-top:16px"><button id="workspaceErrorBack" class="btn btn-secondary" type="button">Volver a Proyectos</button></div></section>`;
+    container.innerHTML = `<section class="panel" style="margin-top:0"><p class="eyebrow">Proyecto</p><h2>No fue posible abrir el espacio de trabajo</h2><p class="muted">${escapeHTML(friendlyErrorMessage(error, "No fue posible cargar la información del Proyecto. Intenta nuevamente o informa al administrador del Sistema."))}</p><div style="margin-top:16px"><button id="workspaceErrorBack" class="btn btn-secondary" type="button">Volver a proyectos</button></div></section>`;
     container.querySelector("#workspaceErrorBack").addEventListener("click", onBack);
   }
 }

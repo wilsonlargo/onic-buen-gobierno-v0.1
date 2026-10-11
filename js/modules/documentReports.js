@@ -1,7 +1,8 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
-import { logManualEvent } from "../security.js?v=5.2.0";
-import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
+import { logManualEvent } from "../security.js?v=5.3.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.3.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.3.0";
+import { uiIcon } from "../components/uiSystem.js?v=5.3.0";
 
 const LOGO_PATH = "./assets/branding/onic-logo.png";
 
@@ -1153,7 +1154,7 @@ function renderActivityToBlocks(
         `${humanDate(activity.fecha_inicio)} - ${humanDate(activity.fecha_fin)}`
       ],
       [
-        "Cumplimiento técnico",
+        "Avance técnico",
         formatPercent(metric.progress)
       ]
     ]),
@@ -1264,7 +1265,7 @@ function renderProjectToBlocks({
         `${humanDate(project.fecha_inicio)} - ${humanDate(project.fecha_fin)}`
       ],
       [
-        "Cumplimiento técnico",
+        "Avance técnico",
         formatPercent(metric.progress)
       ],
       [
@@ -4208,16 +4209,16 @@ export async function openDocumentReportDialog({
         </strong>
 
         <div>
-          <span>✓ Portada institucional ONIC</span>
-          <span>✓ Estructura estratégica</span>
-          <span>✓ Mandatos relacionados</span>
-          <span>✓ Actividades e indicadores</span>
-          <span>✓ Presupuesto y ejecución</span>
-          <span>✓ Evidencias y seguimientos</span>
-          <span>✓ Auditoría y notas</span>
+          <span>${uiIcon("check", "ui-icon document-feature-icon")} Portada institucional ONIC</span>
+          <span>${uiIcon("check", "ui-icon document-feature-icon")} Estructura estratégica</span>
+          <span>${uiIcon("check", "ui-icon document-feature-icon")} Mandatos relacionados</span>
+          <span>${uiIcon("check", "ui-icon document-feature-icon")} Actividades e indicadores</span>
+          <span>${uiIcon("check", "ui-icon document-feature-icon")} Presupuesto y ejecución</span>
+          <span>${uiIcon("check", "ui-icon document-feature-icon")} Evidencias y seguimientos</span>
+          <span>${uiIcon("check", "ui-icon document-feature-icon")} Auditoría y notas</span>
           ${
             scope !== "proyecto"
-              ? "<span>✓ Biblioteca documental</span>"
+              ? `<span>${uiIcon("check", "ui-icon document-feature-icon")} Biblioteca documental</span>`
               : ""
           }
         </div>

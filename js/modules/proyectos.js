@@ -1,9 +1,9 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
-import { updateWithVersion } from "../security.js?v=5.2.0";
-import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
-import { renderProyectoWorkspace } from "./proyectoWorkspace.js?v=5.2.0";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.2.0";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
+import { updateWithVersion } from "../security.js?v=5.3.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.3.0";
+import { renderProyectoWorkspace } from "./proyectoWorkspace.js?v=5.3.0";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.3.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.3.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -473,7 +473,7 @@ function openProyectoForm({
   const editing = Boolean(record);
 
   openModal({
-    title: editing ? "Editar Proyecto" : "Nuevo Proyecto",
+    title: editing ? "Editar proyecto" : "Nuevo proyecto",
     content: `
       <div class="context-ribbon project-context-ribbon">
         <div>
@@ -1782,7 +1782,7 @@ export async function renderProyectos(container, navigationTarget = null) {
         </button>
 
         <button id="newProjectButton" class="btn btn-primary" type="button" disabled>
-          + Nuevo Proyecto
+          + Nuevo proyecto
         </button>
       </div>
     </div>
@@ -2431,7 +2431,7 @@ export async function renderProyectos(container, navigationTarget = null) {
                 </div>
 
                 <div class="calculation-item">
-                  <span>Cumplimiento</span>
+                  <span>Avance técnico</span>
                   <strong>—</strong>
                   <small>Ver avance en Abrir proyecto</small>
                 </div>
@@ -2522,7 +2522,7 @@ export async function renderProyectos(container, navigationTarget = null) {
         <p>
           A diferencia de Líneas y Programas, la ponderación de los Proyectos
           es modificable. El total de los Proyectos de este Programa debe sumar
-          exactamente 100,00 %. El cumplimiento y la contribución se calculan
+          exactamente 100,00 %. El avance técnico y la contribución se calculan
           dentro de cada Proyecto a partir de sus Actividades e Indicadores.
         </p>
       </div>

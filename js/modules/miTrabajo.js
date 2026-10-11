@@ -1,6 +1,6 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
-import { getCurrentProfile } from "../security.js?v=5.2.0";
-import { setAuditContext } from "./auditoria.js?v=5.2.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
+import { getCurrentProfile } from "../security.js?v=5.3.0";
+import { setAuditContext } from "./auditoria.js?v=5.3.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -302,7 +302,7 @@ export async function renderMiTrabajo(container, navigationTarget = null) {
       <div class="my-work-card-list compact">
         ${projects.map((project) => {
           const ctx = maps.projectContext(project);
-          return `<article class="my-work-item"><div><p class="eyebrow">${escapeHTML(vcName(ctx.vc))} · ${escapeHTML(ctx.program?.nombre || "Programa")}</p><h3>${escapeHTML(project.codigo || "Proyecto")} · ${escapeHTML(project.nombre)}</h3><p class="muted">${escapeHTML(project.responsable || "")}</p></div><button class="btn btn-secondary open-own-project" data-id="${project.id}" type="button">Abrir Proyecto</button></article>`;
+          return `<article class="my-work-item"><div><p class="eyebrow">${escapeHTML(vcName(ctx.vc))} · ${escapeHTML(ctx.program?.nombre || "Programa")}</p><h3>${escapeHTML(project.codigo || "Proyecto")} · ${escapeHTML(project.nombre)}</h3><p class="muted">${escapeHTML(project.responsable || "")}</p></div><button class="btn btn-secondary open-own-project" data-id="${project.id}" type="button">Abrir proyecto</button></article>`;
         }).join("") || `<div class="empty-state">Sin Proyectos identificados.</div>`}
       </div>
       <div class="my-work-section-heading"><div><p class="eyebrow">Responsabilidad registrada</p><h3>Actividades</h3></div><strong>${activities.length}</strong></div>
@@ -310,7 +310,7 @@ export async function renderMiTrabajo(container, navigationTarget = null) {
         ${activities.map((activity) => {
           const ctx = maps.activityContext(activity);
           const due = dueLabel(activity.fecha_fin);
-          return `<article class="my-work-item"><div><p class="eyebrow">${escapeHTML(ctx.project?.nombre || "Proyecto")}</p><h3>${escapeHTML(activity.codigo || "Actividad")} · ${escapeHTML(activity.nombre)}</h3><p class="muted">${escapeHTML(activity.responsable || "")} · ${formatDate(activity.fecha_inicio)} → ${formatDate(activity.fecha_fin)}</p></div><div class="my-work-item-side"><span class="my-work-due ${due.className}">${escapeHTML(due.label)}</span><button class="btn btn-secondary open-own-activity" data-id="${activity.id}" type="button">Abrir Actividad</button></div></article>`;
+          return `<article class="my-work-item"><div><p class="eyebrow">${escapeHTML(ctx.project?.nombre || "Proyecto")}</p><h3>${escapeHTML(activity.codigo || "Actividad")} · ${escapeHTML(activity.nombre)}</h3><p class="muted">${escapeHTML(activity.responsable || "")} · ${formatDate(activity.fecha_inicio)} – ${formatDate(activity.fecha_fin)}</p></div><div class="my-work-item-side"><span class="my-work-due ${due.className}">${escapeHTML(due.label)}</span><button class="btn btn-secondary open-own-activity" data-id="${activity.id}" type="button">Abrir actividad</button></div></article>`;
         }).join("") || `<div class="empty-state">Sin Actividades identificadas.</div>`}
       </div>
     `;

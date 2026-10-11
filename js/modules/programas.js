@@ -1,7 +1,7 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
-import { updateWithVersion } from "../security.js?v=5.2.0";
-import { openModal, closeModal } from "../components/modal.js?v=5.2.0";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
+import { updateWithVersion } from "../security.js?v=5.3.0";
+import { openModal, closeModal } from "../components/modal.js?v=5.3.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.3.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -268,7 +268,7 @@ function openProgramaForm({
   const editing = Boolean(record);
 
   openModal({
-    title: editing ? "Editar Programa" : "Nuevo Programa",
+    title: editing ? "Editar programa" : "Nuevo programa",
     content: `
       <div class="context-ribbon context-ribbon-three">
         <div>
@@ -1151,7 +1151,7 @@ function openImportProgramas({
   });
 }
 
-export async function renderProgramas(container) {
+export async function renderProgramas(container, navigationTarget = null) {
   let vigencias = [];
   let consejerias = [];
   let lineas = [];
@@ -1178,7 +1178,7 @@ export async function renderProgramas(container) {
         </button>
 
         <button id="newProgramaButton" class="btn btn-primary" type="button" disabled>
-          + Nuevo Programa
+          + Nuevo programa
         </button>
       </div>
     </div>
@@ -1377,10 +1377,9 @@ export async function renderProgramas(container) {
 
     if (!selectedVigenciaId && vigencias.length) {
       selectedVigenciaId =
-        vigencias.find(
-          (item) => item.estado === "activa"
-        )?.id ||
-        vigencias[0].id;
+        navigationTarget?.vigencia_id && vigencias.some((item) => item.id === navigationTarget.vigencia_id)
+          ? navigationTarget.vigencia_id
+          : vigencias.find((item) => item.estado === "activa")?.id || vigencias[0].id;
     }
 
     vigenciaSelector.innerHTML = vigencias.length
@@ -1452,6 +1451,16 @@ export async function renderProgramas(container) {
       ).join("")}
     `;
 
+    if (
+      navigationTarget?.vigencia_consejeria_id &&
+      consejerias.some((item) => item.id === navigationTarget.vigencia_consejeria_id)
+    ) {
+      selectedVigenciaConsejeriaId = navigationTarget.vigencia_consejeria_id;
+      consejeriaSelector.value = selectedVigenciaConsejeriaId;
+      await loadLineas();
+      return;
+    }
+
     content.innerHTML = `
       <div class="empty-state">
         <strong>Selecciona una Consejería.</strong>
@@ -1508,6 +1517,17 @@ export async function renderProgramas(container) {
       ).join("")}
     `;
 
+    if (
+      navigationTarget?.linea_id &&
+      lineas.some((item) => item.id === navigationTarget.linea_id)
+    ) {
+      selectedLineaId = navigationTarget.linea_id;
+      lineaSelector.value = selectedLineaId;
+      navigationTarget = null;
+      await refreshProgramas();
+      return;
+    }
+
     content.innerHTML = `
       <div class="empty-state">
         <strong>Selecciona una Línea de Acción.</strong>
@@ -1549,7 +1569,7 @@ export async function renderProgramas(container) {
         <div class="empty-state">
           <strong>Esta Línea aún no tiene Programas.</strong>
           <p>
-            Usa <strong>+ Nuevo Programa</strong> para crear el primero o
+            Usa <strong>+ Nuevo programa</strong> para crear el primero o
             <strong>Importar</strong> para cargar varios.
           </p>
         </div>
@@ -1653,7 +1673,7 @@ export async function renderProgramas(container) {
                 </div>
 
                 <div class="calculation-item">
-                  <span>Cumplimiento</span>
+                  <span>Avance técnico</span>
                   <strong>—</strong>
                   <small>
                     ${proyectos

@@ -1,9 +1,10 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.2.0";
-import { setAuditContext } from "./auditoria.js?v=5.2.0";
-import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.2.0";
-import { loadOfficialTrackingSeries, renderTrackingChart } from "./cortesSeguimiento.js?v=5.2.0";
-import { loadAlertSummary, updateAlertsNavBadge } from "./alertasTareas.js?v=5.2.0";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.2.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
+import { setAuditContext } from "./auditoria.js?v=5.3.0";
+import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.3.0";
+import { loadOfficialTrackingSeries, renderTrackingChart } from "./cortesSeguimiento.js?v=5.3.0";
+import { loadAlertSummary, updateAlertsNavBadge } from "./alertasTareas.js?v=5.3.0";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.3.0";
+import { getCurrentProfile } from "../security.js?v=5.3.0";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -915,6 +916,9 @@ export async function renderInicio(container, navigationTarget = null) {
       </div>
     </section>
 
+
+    <section id="inicioQuickActions" class="dashboard-quick-actions" aria-label="Accesos rápidos"></section>
+
     <section
       id="inicioVigenciaIdentity"
       class="dashboard-vigencia-identity hidden"
@@ -970,6 +974,54 @@ export async function renderInicio(container, navigationTarget = null) {
     container.querySelector(
       "#inicioVigenciaSelector"
     );
+
+  const quickActions = container.querySelector("#inicioQuickActions");
+  const profile = getCurrentProfile();
+  const roleActions = {
+    administrador: [
+      ["mi_trabajo", "Mi trabajo", "Revisar pendientes y responsabilidades"],
+      ["calidad", "Control de calidad", "Detectar información incompleta"],
+      ["alertas", "Alertas y tareas", "Atender asuntos prioritarios"],
+      ["usuarios", "Usuarios", "Administrar accesos"]
+    ],
+    coordinador: [
+      ["mi_trabajo", "Mi trabajo", "Revisar pendientes y responsabilidades"],
+      ["calidad", "Control de calidad", "Verificar consistencia de la planeación"],
+      ["alertas", "Alertas y tareas", "Atender asuntos prioritarios"],
+      ["cortes", "Cortes", "Registrar y consultar avances históricos"]
+    ],
+    consejeria: [
+      ["mi_trabajo", "Mi trabajo", "Ver pendientes asignados"],
+      ["proyectos", "Proyectos", "Actualizar la planeación operativa"],
+      ["alertas", "Alertas y tareas", "Atender compromisos"],
+      ["seguimiento_mandatos", "Seguimiento de Mandatos", "Consultar avance asociado"]
+    ],
+    consulta: [
+      ["proyectos", "Proyectos", "Consultar la planeación"],
+      ["seguimiento_mandatos", "Seguimiento de Mandatos", "Consultar avance asociado"],
+      ["cortes", "Cortes", "Consultar el histórico"],
+      ["calidad", "Control de calidad", "Consultar consistencia estructural"]
+    ]
+  };
+
+  if (quickActions) {
+    const actions = roleActions[profile?.rol] || roleActions.consulta;
+    quickActions.innerHTML = `
+      <div class="dashboard-quick-title">
+        <div><p class="eyebrow">Accesos rápidos</p><strong>¿Qué necesitas hacer?</strong></div>
+        <span>${profile?.nombre ? `Hola, ${escapeHTML(profile.nombre.split(" ")[0])}` : "Acceso institucional"}</span>
+      </div>
+      <div class="dashboard-quick-grid">
+        ${actions.map(([view, label, detail]) => `<button type="button" class="quick-action-button" data-quick-view="${view}"><strong>${label}</strong><span>${detail}</span></button>`).join("")}
+      </div>
+    `;
+    quickActions.querySelectorAll("[data-quick-view]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = selectedVigenciaId ? { vigencia_id: selectedVigenciaId } : null;
+        window.dispatchEvent(new CustomEvent("app:navigate", { detail: { view: button.dataset.quickView, target } }));
+      });
+    });
+  }
 
   const documentButton =
     container.querySelector(

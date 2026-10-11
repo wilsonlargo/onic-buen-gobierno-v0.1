@@ -1,21 +1,21 @@
-import { supabaseClient, isSupabaseConfigured } from "./supabaseClient.js?v=5.2.0";
-import { renderInicio } from "./modules/inicio.js?v=5.2.0";
-import { renderVigencias } from "./modules/vigencias.js?v=5.2.0";
-import { renderConsejerias } from "./modules/consejerias.js?v=5.2.0";
-import { renderMandatos } from "./modules/mandatos.js?v=5.2.0";
-import { renderSeguimientoMandatos } from "./modules/seguimientoMandatos.js?v=5.2.0";
-import { renderMiTrabajo } from "./modules/miTrabajo.js?v=5.2.0";
-import { renderControlCalidad } from "./modules/controlCalidad.js?v=5.2.0";
-import { initGlobalSearch } from "./modules/buscadorGlobal.js?v=5.2.0";
-import { renderLineas } from "./modules/lineas.js?v=5.2.0";
-import { renderProgramas } from "./modules/programas.js?v=5.2.0";
-import { renderProyectos } from "./modules/proyectos.js?v=5.2.0";
-import { renderPonderaciones } from "./modules/ponderaciones.js?v=5.2.0";
-import { renderCortesSeguimiento } from "./modules/cortesSeguimiento.js?v=5.2.0";
-import { renderAlertasTareas } from "./modules/alertasTareas.js?v=5.2.0";
-import { renderHistorial } from "./modules/historial.js?v=5.2.0";
-import { renderUsuarios } from "./modules/usuarios.js?v=5.2.0";
-import { initAuditoria, clearAuditContext } from "./modules/auditoria.js?v=5.2.0";
+import { supabaseClient, isSupabaseConfigured } from "./supabaseClient.js?v=5.3.0";
+import { renderInicio } from "./modules/inicio.js?v=5.3.0";
+import { renderVigencias } from "./modules/vigencias.js?v=5.3.0";
+import { renderConsejerias } from "./modules/consejerias.js?v=5.3.0";
+import { renderMandatos } from "./modules/mandatos.js?v=5.3.0";
+import { renderSeguimientoMandatos } from "./modules/seguimientoMandatos.js?v=5.3.0";
+import { renderMiTrabajo } from "./modules/miTrabajo.js?v=5.3.0";
+import { renderControlCalidad } from "./modules/controlCalidad.js?v=5.3.0";
+import { initGlobalSearch } from "./modules/buscadorGlobal.js?v=5.3.0";
+import { renderLineas } from "./modules/lineas.js?v=5.3.0";
+import { renderProgramas } from "./modules/programas.js?v=5.3.0";
+import { renderProyectos } from "./modules/proyectos.js?v=5.3.0";
+import { renderPonderaciones } from "./modules/ponderaciones.js?v=5.3.0";
+import { renderCortesSeguimiento } from "./modules/cortesSeguimiento.js?v=5.3.0";
+import { renderAlertasTareas } from "./modules/alertasTareas.js?v=5.3.0";
+import { renderHistorial } from "./modules/historial.js?v=5.3.0";
+import { renderUsuarios } from "./modules/usuarios.js?v=5.3.0";
+import { initAuditoria, clearAuditContext } from "./modules/auditoria.js?v=5.3.0";
 import {
   loadCurrentUserProfile,
   clearSecuritySession,
@@ -26,9 +26,17 @@ import {
   applyViewPermissions,
   startPermissionObserver,
   logSessionEvent
-} from "./security.js?v=5.2.0";
-import { friendlyErrorMessage } from "./userMessages.js?v=5.2.0";
-import { initUserInterface, enhanceUserInterface } from "./components/uiSystem.js?v=5.2.0";
+} from "./security.js?v=5.3.0";
+import { friendlyErrorMessage } from "./userMessages.js?v=5.3.0";
+import {
+  initUserInterface,
+  enhanceUserInterface,
+  getContextualNavigationTarget,
+  rememberNavigationTarget,
+  setInterfaceView,
+  confirmNavigationAway,
+  clearInterfaceDirtyState
+} from "./components/uiSystem.js?v=5.3.0";
 
 const loginView = document.querySelector("#loginView");
 const appView = document.querySelector("#appView");
@@ -88,6 +96,8 @@ function loginErrorMessage(error) {
 
 function showLogin(message = "") {
   clearSecuritySession();
+  clearInterfaceDirtyState();
+  document.querySelector("#contextBar")?.classList.add("hidden");
   loginView.classList.remove("hidden");
   appView.classList.add("hidden");
   loginMessage.textContent = message;
@@ -144,8 +154,11 @@ async function showApp(session, { registerLogin = false } = {}) {
 async function navigate(viewName, navigationTarget = null) {
   if (!viewAllowed(viewName)) viewName = "inicio";
   const selected = views[viewName];
-  if (!selected) return;
+  if (!selected) return false;
+  if (!confirmNavigationAway()) return false;
 
+  const resolvedTarget = getContextualNavigationTarget(viewName, navigationTarget);
+  rememberNavigationTarget(resolvedTarget);
   currentViewName = viewName;
 
   document.querySelectorAll(".nav-item").forEach((item) => {
@@ -161,9 +174,10 @@ async function navigate(viewName, navigationTarget = null) {
   clearAuditContext();
 
   try {
-    await selected.render(mainContent, navigationTarget);
+    await selected.render(mainContent, resolvedTarget);
     applyViewPermissions(viewName, mainContent);
     enhanceUserInterface(mainContent);
+    setInterfaceView(viewName, selected.title, mainContent, resolvedTarget);
     window.scrollTo({ top: 0, behavior: "auto" });
     mainContent.focus({ preventScroll: true });
   } catch (error) {
@@ -176,11 +190,12 @@ async function navigate(viewName, navigationTarget = null) {
         <button class="btn btn-secondary" type="button" data-retry-view="${viewName}">Intentar nuevamente</button>
       </section>
     `;
-    mainContent.querySelector("[data-retry-view]")?.addEventListener("click", () => navigate(viewName, navigationTarget));
+    mainContent.querySelector("[data-retry-view]")?.addEventListener("click", () => navigate(viewName, resolvedTarget));
     enhanceUserInterface(mainContent);
   } finally {
     mainContent.setAttribute("aria-busy", "false");
   }
+  return true;
 }
 
 mainNav.addEventListener("click", async (event) => {
@@ -243,6 +258,7 @@ loginForm.addEventListener("submit", async (event) => {
 
 logoutButton.addEventListener("click", async () => {
   if (!supabaseClient) return;
+  if (!confirmNavigationAway()) return;
   await logSessionEvent("cerrar_sesion");
   await supabaseClient.auth.signOut();
   showLogin("Sesión cerrada.");
