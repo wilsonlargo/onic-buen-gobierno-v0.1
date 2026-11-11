@@ -10728,7 +10728,7 @@ textarea:focus-visible,
 }
 
 /* ==========================================================
-   V5.4.7 · CONSEJERÍAS ESTRUCTURADAS + CONFIGURACIÓN
+   V5.4.8 · CONSEJERÍAS ESTRUCTURADAS + CONFIGURACIÓN
    ========================================================== */
 .sr-only {
   position: absolute !important;
@@ -10776,7 +10776,16 @@ textarea:focus-visible,
 
 .vigencia-consejeria-card.operational .vc-card-body {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
+}
+
+.vigencia-consejeria-card.operational .vc-operational-person,
+.vigencia-consejeria-card.operational .vc-structure-strip,
+.vigencia-consejeria-card.operational .vc-progress-row {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
 }
 
 .vc-operational-person,
@@ -10817,12 +10826,15 @@ textarea:focus-visible,
 }
 
 .vc-structure-strip span {
-  margin-top: 2px;
+  margin-top: 3px;
   color: var(--text-soft);
-  font-size: .68rem;
+  font-size: .64rem;
   font-weight: 800;
+  line-height: 1.15;
   text-transform: uppercase;
-  letter-spacing: .03em;
+  letter-spacing: .015em;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .consejeria-structure-summary-grid {
@@ -11144,7 +11156,7 @@ textarea:focus-visible,
 
 
 /* ==========================================================
-   V5.4.7 · CONSEJERÍAS NAVEGABLES Y TARJETAS ROBUSTAS
+   V5.4.8 · CONSEJERÍAS NAVEGABLES Y TARJETAS ROBUSTAS
    ========================================================== */
 .consejerias-operational-actions {
   min-width: 0;
@@ -11163,6 +11175,8 @@ textarea:focus-visible,
 .vigencia-consejeria-card.operational {
   min-width: 0;
   overflow: hidden;
+  container-type: inline-size;
+  container-name: consejeria-card;
 }
 
 .vigencia-consejeria-card.operational .vc-card-header {
@@ -11254,6 +11268,34 @@ textarea:focus-visible,
 .structure-open-unit,
 .structure-open-activity {
   white-space: nowrap;
+}
+
+.vigencia-consejeria-card.operational .vc-structure-strip span {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+@container consejeria-card (max-width: 390px) {
+  .vc-structure-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vc-structure-strip > div {
+    padding: 9px 8px;
+  }
+
+  .vc-structure-strip > div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .vc-structure-strip > div:nth-child(-n+2) {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .vc-structure-strip > div:nth-child(3) {
+    border-right: 1px solid var(--border);
+  }
 }
 
 @media (max-width: 760px) {

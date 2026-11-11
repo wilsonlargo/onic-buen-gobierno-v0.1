@@ -1,10 +1,10 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.7";
-import { setAuditContext } from "./auditoria.js?v=5.4.7";
-import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.7";
-import { loadOfficialTrackingSeries, renderTrackingChart } from "./cortesSeguimiento.js?v=5.4.7";
-import { loadAlertSummary, updateAlertsNavBadge } from "./alertasTareas.js?v=5.4.7";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.4.7";
-import { getCurrentProfile } from "../security.js?v=5.4.7";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.9";
+import { setAuditContext } from "./auditoria.js?v=5.4.9";
+import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.9";
+import { loadOfficialTrackingSeries, renderTrackingChart } from "./cortesSeguimiento.js?v=5.4.9";
+import { loadAlertSummary, updateAlertsNavBadge } from "./alertasTareas.js?v=5.4.9";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.9";
+import { getCurrentProfile } from "../security.js?v=5.4.9";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
