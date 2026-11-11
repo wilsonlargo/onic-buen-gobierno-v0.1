@@ -1,12 +1,12 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.9";
-import { openModal, closeModal } from "../components/modal.js?v=5.4.9";
-import { uiIcon } from "../components/uiSystem.js?v=5.4.9";
-import { openVigenciaImportDialog } from "./vigenciaImporter.js?v=5.4.9";
-import { openForceDeleteVigenciaDialog } from "./vigenciaForceDelete.js?v=5.4.9";
-import { openVigenciaBackupDialog } from "./vigenciaBackup.js?v=5.4.9";
-import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.9";
-import { updateWithVersion } from "../security.js?v=5.4.9";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.4.9";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.10";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.10";
+import { uiIcon } from "../components/uiSystem.js?v=5.4.10";
+import { openVigenciaImportDialog } from "./vigenciaImporter.js?v=5.4.10";
+import { openForceDeleteVigenciaDialog } from "./vigenciaForceDelete.js?v=5.4.10";
+import { openVigenciaBackupDialog } from "./vigenciaBackup.js?v=5.4.10";
+import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.10";
+import { updateWithVersion } from "../security.js?v=5.4.10";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.10";
 
 function escapeHTML(value = "") {
   return String(value)

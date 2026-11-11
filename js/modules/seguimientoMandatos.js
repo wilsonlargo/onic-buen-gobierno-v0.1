@@ -1,6 +1,6 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.9";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.9";
-import { isConsejeriaUser } from "../security.js?v=5.4.9";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.10";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.10";
+import { isConsejeriaUser } from "../security.js?v=5.4.10";
 
 function escapeHTML(value = "") {
   return String(value ?? "")

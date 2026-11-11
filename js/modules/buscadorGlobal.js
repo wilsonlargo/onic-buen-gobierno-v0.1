@@ -1,6 +1,6 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.9";
-import { openModal, closeModal } from "../components/modal.js?v=5.4.9";
-import { uiIcon } from "../components/uiSystem.js?v=5.4.9";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.10";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.10";
+import { uiIcon } from "../components/uiSystem.js?v=5.4.10";
 
 let cachedIndex = null;
 let cachedAt = 0;

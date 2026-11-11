@@ -1,10 +1,10 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.9";
-import { updateWithVersion, logManualEvent } from "../security.js?v=5.4.9";
-import { openModal, closeModal } from "../components/modal.js?v=5.4.9";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.9";
-import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.9";
-import { renderProjectPlanner, plannerColorOptions, exportProjectPlanner } from "./projectPlanner.js?v=5.4.9";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.4.9";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.10";
+import { updateWithVersion, logManualEvent } from "../security.js?v=5.4.10";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.10";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.10";
+import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.10";
+import { renderProjectPlanner, plannerColorOptions, exportProjectPlanner } from "./projectPlanner.js?v=5.4.10";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.10";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -183,7 +183,10 @@ function normalizeActivityTab(tab, project, activity, budgetItems = []) {
   const aliases = { indicadores: "avance", seguimiento: "avance" };
   const normalized = aliases[tab] || tab || "general";
   if (normalized === "presupuesto" && !activityHasBudgetAccess(project, activity, budgetItems)) return "general";
-  return ["general", "avance", "evidencias", "presupuesto"].includes(normalized) ? normalized : "general";
+  const allowed = isGeneralActivityUnit(project)
+    ? ["general", "planeador", "avance", "evidencias", "presupuesto"]
+    : ["general", "avance", "evidencias", "presupuesto"];
+  return allowed.includes(normalized) ? normalized : "general";
 }
 
 function calculateProjectMetrics(activities, indicators, budgetItems) {
@@ -1192,6 +1195,7 @@ export async function renderProyectoWorkspace(container, options) {
         },
         sectionOptions: [
           { value: "general", label: "General", navigation: { activity_tab: "general" } },
+          ...(isGeneralActivityUnit(project) ? [{ value: "planeador", label: "Planeador", navigation: { activity_tab: "planeador" } }] : []),
           { value: "avance", label: "Avance", navigation: { activity_tab: "avance" } },
           { value: "evidencias", label: "Evidencias", navigation: { activity_tab: "evidencias" } },
           ...(activityHasBudgetAccess(project, activity, budgetForActivity(activity.id)) ? [{ value: "presupuesto", label: "Presupuesto", navigation: { activity_tab: "presupuesto" } }] : [])
@@ -1200,7 +1204,7 @@ export async function renderProyectoWorkspace(container, options) {
     });
   }
 
-  function openPlannerColorDialog(activity, colorOptions) {
+  function openPlannerColorDialog(activity, colorOptions, onUpdated = null) {
     openModal({
       title: "Color de la actividad",
       content: `
@@ -1225,7 +1229,8 @@ export async function renderProyectoWorkspace(container, options) {
         await updateActivity(activity, { planeador_color: button.dataset.plannerColor || null });
         closeModal();
         await reloadOperationalData();
-        renderPlanner();
+        if (typeof onUpdated === "function") onUpdated();
+        else renderPlanner();
         showToast("Color del Planeador actualizado.");
       } catch (error) {
         console.error(error);
@@ -1570,7 +1575,9 @@ export async function renderProyectoWorkspace(container, options) {
 
   function activityNavHTML(activity) {
     const budgetItems = budgetForActivity(activity.id);
-    const tabs = [["general","General"],["avance","Avance"],["evidencias","Evidencias"]];
+    const tabs = [["general","General"]];
+    if (isGeneralActivityUnit(project)) tabs.push(["planeador","Planeador"]);
+    tabs.push(["avance","Avance"],["evidencias","Evidencias"]);
     if (activityHasBudgetAccess(project, activity, budgetItems)) tabs.push(["presupuesto","Presupuesto"]);
     activityTab = normalizeActivityTab(activityTab, project, activity, budgetItems);
     return `<nav class="project-workspace-tabs activity-tabs" aria-label="Secciones de ${isGeneralActivityUnit(project) ? "la Actividad general" : "la Actividad"}">${tabs.map(([id,label]) => `<button class="${activityTab === id ? "active" : ""}" data-activity-tab="${id}" type="button">${label}</button>`).join("")}</nav>`;
@@ -1685,6 +1692,80 @@ export async function renderProyectoWorkspace(container, options) {
         showToast("Actividad general actualizada.");
       } catch (error) {
         console.error(error); message.textContent = friendlyErrorMessage(error, "No fue posible guardar la Actividad general."); submit.disabled = false; submit.textContent = "Guardar cambios";
+      }
+    });
+  }
+
+  function renderGeneralActivityPlanner() {
+    const body = container.querySelector("#activityWorkspaceBody");
+    const activity = currentActivity();
+    if (!activity) {
+      body.innerHTML = `<div class="empty-state workspace-empty"><strong>No hay una unidad operativa disponible.</strong><p>Revisa la información general de esta Actividad.</p></div>`;
+      return;
+    }
+    const activityIndicators = indicatorsForActivity(activity.id);
+    const activityBudget = budgetForActivity(activity.id);
+    const activityEvidence = evidenceForActivity(activity.id);
+    const metrics = calculateProjectMetrics([activity], activityIndicators, activityBudget);
+    renderProjectPlanner({
+      container: body,
+      project,
+      activities: [activity],
+      indicators: activityIndicators,
+      budgetItems: activityBudget,
+      evidence: activityEvidence,
+      metrics,
+      view: plannerView,
+      scale: plannerScale,
+      unitMode: "general",
+      onViewChange: (view) => { plannerView = view; renderGeneralActivityPlanner(); },
+      onScaleChange: (scale) => { plannerScale = scale; renderGeneralActivityPlanner(); },
+      onOpenActivity: (_activityId, tab = "general") => {
+        activityTab = tab === "seguimiento" || tab === "indicadores" ? "avance" : tab;
+        renderActivityWorkspace();
+      },
+      onEditActivity: () => {
+        activityTab = "general";
+        renderActivityWorkspace();
+      },
+      onAuditActivity: openPlannerActivityAudit,
+      onChangeColor: (item, options) => openPlannerColorDialog(item, options, renderGeneralActivityPlanner),
+      onExport: async ({ format, view, scale }) => {
+        try {
+          await exportProjectPlanner({
+            format, view, scale, project,
+            activities: [activity],
+            indicators: activityIndicators,
+            budgetItems: activityBudget,
+            evidence: activityEvidence,
+            metrics,
+            unitMode: "general",
+            context: {
+              vigenciaNombre: vigencia.nombre,
+              consejeriaNombre: vigenciaConsejeria.consejerias.nombre_largo || vigenciaConsejeria.consejerias.nombre_corto,
+              lineaNombre: linea.nombre,
+              programaNombre: programa.nombre
+            }
+          });
+          await logManualEvent({
+            action: "exportar_planeador",
+            entityType: "proyecto",
+            entityId: project.id,
+            entityName: project.nombre,
+            vigenciaId: vigencia.id,
+            vigenciaConsejeriaId: vigenciaConsejeria.id,
+            detail: {
+              tipo_unidad: "actividad_general",
+              formato: format === "pdf" ? "PDF" : "Excel",
+              vista: view === "cronograma" ? "Cronograma" : "Matriz",
+              escala: view === "cronograma" ? (scale === "trimestral" ? "Trimestral" : "Mensual") : null
+            }
+          });
+          showToast(`Planeador exportado en ${format === "pdf" ? "PDF" : "Excel"}.`);
+        } catch (error) {
+          console.error(error);
+          showToast(friendlyErrorMessage(error, "No fue posible exportar el Planeador."));
+        }
       }
     });
   }
@@ -2067,6 +2148,7 @@ export async function renderProyectoWorkspace(container, options) {
       },
       sectionOptions: [
         { value: "general", label: "General", navigation: { activity_tab: "general" } },
+        ...(isGeneralActivityUnit(project) ? [{ value: "planeador", label: "Planeador", navigation: { activity_tab: "planeador" } }] : []),
         { value: "avance", label: "Avance", navigation: { activity_tab: "avance" } },
         { value: "evidencias", label: "Evidencias", navigation: { activity_tab: "evidencias" } },
         ...(activityHasBudgetAccess(project, activity, budgetForActivity(activity.id)) ? [{ value: "presupuesto", label: "Presupuesto", navigation: { activity_tab: "presupuesto" } }] : [])
@@ -2079,7 +2161,8 @@ export async function renderProyectoWorkspace(container, options) {
     if (activity) activityTab = normalizeActivityTab(activityTab, project, activity, budgetForActivity(activity.id));
     syncActivityAuditContext();
     container.querySelectorAll("[data-activity-tab]").forEach((button) => button.classList.toggle("active", button.dataset.activityTab === activityTab));
-    if (activityTab === "avance") await renderActivityAdvance();
+    if (activityTab === "planeador" && isGeneralActivityUnit(project)) renderGeneralActivityPlanner();
+    else if (activityTab === "avance") await renderActivityAdvance();
     else if (activityTab === "presupuesto") renderBudget();
     else if (activityTab === "evidencias") renderEvidence();
     else renderActivityGeneral();

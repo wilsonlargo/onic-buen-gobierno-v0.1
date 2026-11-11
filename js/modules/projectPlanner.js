@@ -1,4 +1,4 @@
-import { uiIcon } from "../components/uiSystem.js?v=5.4.9";
+import { uiIcon } from "../components/uiSystem.js?v=5.4.10";
 const COLOR_OPTIONS = [
   { value: "", label: "Automático", hex: "#4f7f67" },
   { value: "verde", label: "Verde", hex: "#4f7f67" },
@@ -182,13 +182,14 @@ function todayPosition(range) {
   return total <= 0 ? null : ((today.getTime() - range.start.getTime()) / total) * 100;
 }
 
-function summaryHTML({ project, activities, metrics, range }) {
+function summaryHTML({ project, activities, metrics, range, unitMode = "project" }) {
   const noDates = activities.filter((item) => !item.fecha_inicio || !item.fecha_fin).length;
   const duration = range ? monthDifferenceInclusive(range.start, range.end) : null;
+  const isGeneral = unitMode === "general";
   return `
     <div class="planner-summary-grid">
-      <div class="planner-summary-card"><span>Duración planificada</span><strong>${duration ? `${duration} ${duration === 1 ? "mes" : "meses"}` : "—"}</strong><small>${range?.source === "actividades" ? "Calculada desde las Actividades" : "Periodo del Proyecto"}</small></div>
-      <div class="planner-summary-card"><span>Actividades</span><strong>${activities.length}</strong><small>${noDates ? `${noDates} sin periodo completo` : "Todas con periodo definido"}</small></div>
+      <div class="planner-summary-card"><span>Duración planificada</span><strong>${duration ? `${duration} ${duration === 1 ? "mes" : "meses"}` : "—"}</strong><small>${isGeneral ? "Periodo de la Actividad general" : (range?.source === "actividades" ? "Calculada desde las Actividades" : "Periodo del Proyecto")}</small></div>
+      <div class="planner-summary-card"><span>${isGeneral ? "Unidad planificada" : "Actividades"}</span><strong>${activities.length}</strong><small>${isGeneral ? (noDates ? "Periodo incompleto" : "Actividad general") : (noDates ? `${noDates} sin periodo completo` : "Todas con periodo definido")}</small></div>
       <div class="planner-summary-card"><span>Cobertura técnica</span><strong>${metrics.includedCount ? `${metrics.measurableCount}/${metrics.includedCount}` : "—"}</strong><small>Actividades medibles</small></div>
       <div class="planner-summary-card"><span>Avance técnico</span><strong>${formatPercent(metrics.technicalProgress)}</strong><small>Calculado desde indicadores</small></div>
     </div>`;
@@ -204,9 +205,11 @@ function quickLinksHTML(activity, counts, budget) {
     </div>`;
 }
 
-function matrixHTML({ activities, metrics, indicators, evidence, budgetItems }) {
+function matrixHTML({ activities, metrics, indicators, evidence, budgetItems, unitMode = "project" }) {
   if (!activities.length) {
-    return `<div class="empty-state workspace-empty"><strong>El Proyecto todavía no tiene actividades.</strong><p>Crea actividades para construir la matriz de planeación y seguimiento.</p></div>`;
+    return unitMode === "general"
+      ? `<div class="empty-state workspace-empty"><strong>La Actividad general no tiene soporte operativo disponible.</strong><p>Revisa la información general de esta unidad.</p></div>`
+      : `<div class="empty-state workspace-empty"><strong>El Proyecto todavía no tiene actividades.</strong><p>Crea actividades para construir la matriz de planeación y seguimiento.</p></div>`;
   }
 
   const indicatorCounts = new Map();
@@ -242,8 +245,8 @@ function matrixHTML({ activities, metrics, indicators, evidence, budgetItems }) 
             </div>
             ${quickLinksHTML(activity, counts, budget)}
             <div class="planner-card-actions">
-              <button class="btn btn-primary planner-open-activity" type="button" data-id="${activity.id}">Abrir actividad</button>
-              <button class="btn btn-secondary planner-edit-activity edit-activity" type="button" data-id="${activity.id}">Planificar</button>
+              <button class="btn btn-primary planner-open-activity" type="button" data-id="${activity.id}">${unitMode === "general" ? "Abrir ficha" : "Abrir actividad"}</button>
+              ${unitMode === "general" ? "" : `<button class="btn btn-secondary planner-edit-activity edit-activity" type="button" data-id="${activity.id}">Planificar</button>`}
               <button class="btn btn-secondary planner-audit-note" type="button" data-id="${activity.id}">Nota</button>
             </div>
           </article>`;
@@ -251,11 +254,16 @@ function matrixHTML({ activities, metrics, indicators, evidence, budgetItems }) 
     </div>`;
 }
 
-function timelineHTML({ project, activities, metrics, range, scale }) {
+function timelineHTML({ project, activities, metrics, range, scale, unitMode = "project" }) {
   if (!activities.length) {
-    return `<div class="empty-state workspace-empty"><strong>No hay actividades para mostrar.</strong><p>Agrega actividades al Proyecto para construir la línea de tiempo.</p></div>`;
+    return unitMode === "general"
+      ? `<div class="empty-state workspace-empty"><strong>No hay una unidad operativa para mostrar.</strong><p>Revisa la información general de esta Actividad.</p></div>`
+      : `<div class="empty-state workspace-empty"><strong>No hay actividades para mostrar.</strong><p>Agrega actividades al Proyecto para construir la línea de tiempo.</p></div>`;
   }
   if (!range) {
+    if (unitMode === "general" && activities[0]) {
+      return `<div class="calculation-note"><strong>La línea de tiempo necesita fechas.</strong><p>Define la fecha de inicio y cierre de esta Actividad general para construir su cronograma.</p><div style="margin-top:10px"><button class="btn btn-secondary planner-edit-activity edit-activity" type="button" data-id="${activities[0].id}">Completar periodo</button></div></div>`;
+    }
     return `<div class="calculation-note"><strong>La línea de tiempo necesita fechas.</strong><p>Define el periodo del Proyecto o las fechas de inicio y cierre de las Actividades.</p></div>`;
   }
 
@@ -267,7 +275,7 @@ function timelineHTML({ project, activities, metrics, range, scale }) {
     <div class="planner-timeline-scroll">
       <div class="planner-timeline" style="--timeline-min-width:${minWidth}px">
         <div class="planner-timeline-head">
-          <div class="planner-timeline-left-head">Actividad</div>
+          <div class="planner-timeline-left-head">${unitMode === "general" ? "Actividad general" : "Actividad"}</div>
           <div class="planner-axis" style="grid-template-columns:repeat(${periods.length}, minmax(0,1fr))">
             ${periods.map((period) => `<div><strong>${period.label}</strong><small>${escapeHTML(period.calendarLabel)}</small></div>`).join("")}
           </div>
@@ -288,7 +296,7 @@ function timelineHTML({ project, activities, metrics, range, scale }) {
                 <div class="planner-track-area">
                   <div class="planner-grid-lines" style="grid-template-columns:repeat(${periods.length}, minmax(0,1fr))">${periods.map(() => `<span></span>`).join("")}</div>
                   ${today !== null ? `<span class="planner-today-line" style="left:${today}%"><em>Hoy</em></span>` : ""}
-                  ${position ? `<button class="planner-timebar planner-timeline-open" type="button" data-id="${activity.id}" style="left:${position.left}%;width:${position.width}%;border-color:${color.hex};background:${hexAlpha(color.hex, "22")}" title="${escapeHTML(activity.nombre)} · ${formatDate(activity.fecha_inicio)} a ${formatDate(activity.fecha_fin)}"><span class="planner-timebar-progress" style="width:${progress === null ? 0 : clamp(Number(progress), 0, 100)}%;background:${color.hex}"></span><strong>${progress === null ? "" : `${Math.round(Number(progress))}%`}</strong></button>` : `<button class="planner-no-dates planner-edit-activity edit-activity" type="button" data-id="${activity.id}">Definir fechas</button>`}
+                  ${position ? `<button class="planner-timebar planner-timeline-open" type="button" data-id="${activity.id}" style="left:${position.left}%;width:${position.width}%;border-color:${color.hex};background:${hexAlpha(color.hex, "22")}" title="${escapeHTML(activity.nombre)} · ${formatDate(activity.fecha_inicio)} a ${formatDate(activity.fecha_fin)}"><span class="planner-timebar-progress" style="width:${progress === null ? 0 : clamp(Number(progress), 0, 100)}%;background:${color.hex}"></span><strong>${progress === null ? "" : `${Math.round(Number(progress))}%`}</strong></button>` : `<button class="planner-no-dates planner-edit-activity edit-activity" type="button" data-id="${activity.id}">${unitMode === "general" ? "Completar periodo" : "Definir fechas"}</button>`}
                 </div>
               </div>`;
           }).join("")}
@@ -404,13 +412,13 @@ function pdfHeader(logo, title) {
   };
 }
 
-function pdfMetadata(project, context, viewLabel, scaleLabel = null) {
+function pdfMetadata(project, context, viewLabel, scaleLabel = null, unitMode = "project") {
   const c = plannerExportContext(context);
   const rows = [
-    ["Proyecto", project.nombre || "—", "Vigencia", c.vigencia],
+    [unitMode === "general" ? "Actividad general" : "Proyecto", project.nombre || "—", "Vigencia", c.vigencia],
     ["Consejería", c.consejeria, "Programa", c.programa],
     ["Línea de Acción", c.linea, "Vista", `${viewLabel}${scaleLabel ? ` · ${scaleLabel}` : ""}`],
-    ["Periodo del Proyecto", `${formatDate(project.fecha_inicio)} – ${formatDate(project.fecha_fin)}`, "Generado", new Intl.DateTimeFormat("es-CO", { day: "2-digit", month: "long", year: "numeric" }).format(new Date())]
+    [unitMode === "general" ? "Periodo de la Actividad" : "Periodo del Proyecto", `${formatDate(project.fecha_inicio)} – ${formatDate(project.fecha_fin)}`, "Generado", new Intl.DateTimeFormat("es-CO", { day: "2-digit", month: "long", year: "numeric" }).format(new Date())]
   ];
   return {
     table: {
@@ -431,11 +439,11 @@ function pdfMetadata(project, context, viewLabel, scaleLabel = null) {
   };
 }
 
-function pdfSummary(metrics, activities, range) {
+function pdfSummary(metrics, activities, range, unitMode = "project") {
   const duration = range ? monthDifferenceInclusive(range.start, range.end) : null;
   const values = [
     ["Duración", duration ? `${duration} ${duration === 1 ? "mes" : "meses"}` : "—"],
-    ["Actividades", String(activities.length)],
+    [unitMode === "general" ? "Unidad" : "Actividades", String(activities.length)],
     ["Cobertura técnica", metrics.includedCount ? `${metrics.measurableCount}/${metrics.includedCount}` : "—"],
     ["Avance técnico", formatPercent(metrics.technicalProgress)]
   ];
@@ -453,17 +461,19 @@ function pdfSummary(metrics, activities, range) {
   };
 }
 
-async function exportPlannerPdf({ project, activities, indicators, budgetItems, evidence, metrics, view, scale, context }) {
+async function exportPlannerPdf({ project, activities, indicators, budgetItems, evidence, metrics, view, scale, context, unitMode = "project" }) {
   if (!window.pdfMake || typeof window.pdfMake.createPdf !== "function") {
     throw new Error("El generador PDF no está disponible. Recarga la página y vuelve a intentarlo.");
   }
   const range = deriveTimelineRange(project, activities);
   const stats = activityExportStats({ activities, indicators, evidence, budgetItems, metrics });
   const logo = await logoDataUrl();
+  const unitTitle = unitMode === "general" ? "Actividad general" : "Proyecto";
+  const plannerTitle = unitMode === "general" ? "Planeador de la Actividad general" : "Planeador del Proyecto";
   const content = [
-    pdfHeader(logo, view === "cronograma" ? "Planeador del Proyecto - Cronograma" : "Planeador del Proyecto - Matriz"),
-    pdfMetadata(project, context, view === "cronograma" ? "Cronograma" : "Matriz", view === "cronograma" ? (scale === "trimestral" ? "Trimestral" : "Mensual") : null),
-    pdfSummary(metrics, activities, range)
+    pdfHeader(logo, view === "cronograma" ? `${plannerTitle} - Cronograma` : `${plannerTitle} - Matriz`),
+    pdfMetadata(project, context, view === "cronograma" ? "Cronograma" : "Matriz", view === "cronograma" ? (scale === "trimestral" ? "Trimestral" : "Mensual") : null, unitMode),
+    pdfSummary(metrics, activities, range, unitMode)
   ];
 
   if (view === "matriz") {
@@ -560,9 +570,9 @@ async function exportPlannerPdf({ project, activities, indicators, budgetItems, 
     pageOrientation: "landscape",
     pageMargins: [28, 34, 28, 30],
     info: {
-      title: `${project.nombre || "Proyecto"} - Planeador`,
+      title: `${project.nombre || unitTitle} - Planeador`,
       author: "Organización Nacional Indígena de Colombia - ONIC",
-      subject: "Planeador del Proyecto",
+      subject: plannerTitle,
       creator: "ONIC Buen Gobierno"
     },
     footer: (currentPage, pageCount) => ({
@@ -609,7 +619,7 @@ function excelHeader(cell, fill = "#0F4230") {
   cell.border = excelBorder();
 }
 
-function excelMetadataSheetHeader(ws, project, context, title, metrics, range, totalColumns = 10) {
+function excelMetadataSheetHeader(ws, project, context, title, metrics, range, totalColumns = 10, unitMode = "project") {
   const c = plannerExportContext(context);
   ws.mergeCells(1, 1, 1, Math.max(4, totalColumns));
   ws.getCell("A1").value = "ORGANIZACIÓN NACIONAL INDÍGENA DE COLOMBIA - ONIC";
@@ -620,7 +630,7 @@ function excelMetadataSheetHeader(ws, project, context, title, metrics, range, t
   ws.getCell("A2").font = { bold: true, color: { argb: "FF1C2B24" }, size: 16 };
 
   const rows = [
-    ["Proyecto", project.nombre || "—", "Vigencia", c.vigencia],
+    [unitMode === "general" ? "Actividad general" : "Proyecto", project.nombre || "—", "Vigencia", c.vigencia],
     ["Consejería", c.consejeria, "Programa", c.programa],
     ["Línea de Acción", c.linea, "Periodo", `${formatDate(project.fecha_inicio)} – ${formatDate(project.fecha_fin)}`]
   ];
@@ -633,7 +643,7 @@ function excelMetadataSheetHeader(ws, project, context, title, metrics, range, t
   });
   ws.getRow(8).values = [
     "Duración planificada", range ? monthDifferenceInclusive(range.start, range.end) : "—",
-    "Actividades", metrics.includedCount || 0,
+    unitMode === "general" ? "Unidad" : "Actividades", metrics.includedCount || 0,
     "Actividades medibles", metrics.measurableCount || 0,
     "Avance técnico", metrics.technicalProgress === null ? null : Number(metrics.technicalProgress) / 100
   ];
@@ -654,7 +664,7 @@ async function saveExcelWorkbook(workbook, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
-async function exportPlannerExcel({ project, activities, indicators, budgetItems, evidence, metrics, view, scale, context }) {
+async function exportPlannerExcel({ project, activities, indicators, budgetItems, evidence, metrics, view, scale, context, unitMode = "project" }) {
   const ExcelJS = requireExcelJS();
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "ONIC Buen Gobierno";
@@ -666,7 +676,7 @@ async function exportPlannerExcel({ project, activities, indicators, budgetItems
 
   if (view === "matriz") {
     const ws = workbook.addWorksheet("Planeador - Matriz", { views: [{ state: "frozen", ySplit: 10 }] });
-    excelMetadataSheetHeader(ws, project, context, "PLANEADOR DEL PROYECTO - MATRIZ", metrics, range, 11);
+    excelMetadataSheetHeader(ws, project, context, unitMode === "general" ? "PLANEADOR DE LA ACTIVIDAD GENERAL - MATRIZ" : "PLANEADOR DEL PROYECTO - MATRIZ", metrics, range, 11, unitMode);
     const headerRow = 10;
     const headers = ["Código", "Actividad", "Responsable", "Inicio", "Fin", "Estado", "Avance técnico", "Indicadores", "Evidencias", "Presupuesto programado", "Color"];
     ws.getRow(headerRow).values = headers;
@@ -707,7 +717,7 @@ async function exportPlannerExcel({ project, activities, indicators, budgetItems
     if (!range) throw new Error("El cronograma requiere fechas del Proyecto o de las Actividades.");
     const periods = makePeriods(range, scale);
     const ws = workbook.addWorksheet("Planeador - Cronograma", { views: [{ state: "frozen", xSplit: 6, ySplit: 10 }] });
-    excelMetadataSheetHeader(ws, project, context, `PLANEADOR DEL PROYECTO - CRONOGRAMA ${scale === "trimestral" ? "TRIMESTRAL" : "MENSUAL"}`, metrics, range, 6 + periods.length);
+    excelMetadataSheetHeader(ws, project, context, `${unitMode === "general" ? "PLANEADOR DE LA ACTIVIDAD GENERAL" : "PLANEADOR DEL PROYECTO"} - CRONOGRAMA ${scale === "trimestral" ? "TRIMESTRAL" : "MENSUAL"}`, metrics, range, 6 + periods.length, unitMode);
     const headerRow = 10;
     const baseHeaders = ["Código", "Actividad", "Responsable", "Inicio", "Fin", "Avance"];
     ws.getRow(headerRow).values = [...baseHeaders, ...periods.map((period) => `${period.label}\n${period.calendarLabel}${periodContainsToday(period) ? "\nHOY" : ""}`)];
@@ -789,6 +799,7 @@ export function renderProjectPlanner({
   metrics,
   view = "matriz",
   scale = "mensual",
+  unitMode = "project",
   onViewChange,
   onScaleChange,
   onOpenActivity,
@@ -800,14 +811,15 @@ export function renderProjectPlanner({
 }) {
   const range = deriveTimelineRange(project, activities);
   const body = container;
+  const isGeneral = unitMode === "general";
 
   body.innerHTML = `
     <section class="workspace-section workspace-section-flush planner-section">
       <div class="workspace-section-heading planner-heading">
-        <div><p class="eyebrow">Planeación y seguimiento</p><h3>Planeador del Proyecto</h3><p class="muted">Visualiza las mismas Actividades del Proyecto como matriz o línea de tiempo. Indicadores, Evidencias, Presupuesto y Seguimiento permanecen vinculados a cada Actividad.</p></div>
-        <button id="plannerNewActivity" class="btn btn-primary" type="button">+ Nueva actividad</button>
+        <div><p class="eyebrow">Planeación y seguimiento</p><h3>${isGeneral ? "Planeador de la Actividad general" : "Planeador del Proyecto"}</h3><p class="muted">${isGeneral ? "Visualiza esta Actividad general como matriz o línea de tiempo. Su avance se calcula desde los indicadores y no requiere crear subactividades." : "Visualiza las mismas Actividades del Proyecto como matriz o línea de tiempo. Indicadores, Evidencias, Presupuesto y Seguimiento permanecen vinculados a cada Actividad."}</p></div>
+        ${isGeneral ? "" : `<button id="plannerNewActivity" class="btn btn-primary" type="button">+ Nueva actividad</button>`}
       </div>
-      ${summaryHTML({ project, activities, metrics, range })}
+      ${summaryHTML({ project, activities, metrics, range, unitMode })}
       <div class="planner-toolbar">
         <div class="planner-view-switch" role="group" aria-label="Vista del Planeador">
           <button class="${view === "matriz" ? "active" : ""}" data-planner-view="matriz" type="button">Vista matriz</button>
@@ -822,11 +834,11 @@ export function renderProjectPlanner({
           <button class="btn btn-secondary planner-export-button" data-planner-export="excel" type="button" title="Exportar la vista actual del Planeador en Excel">Excel</button>
         </div>
       </div>
-      <div class="planner-guidance"><strong>Cómo leer el Planeador</strong><p>La extensión de cada barra representa el tiempo programado de la Actividad. El relleno interior muestra su avance técnico calculado desde los indicadores. El color es únicamente una ayuda visual y no modifica estados, ponderaciones ni porcentajes.</p></div>
+      <div class="planner-guidance"><strong>Cómo leer el Planeador</strong><p>${isGeneral ? "La barra representa el periodo programado de esta Actividad general. El relleno interior muestra su avance técnico calculado desde los indicadores. El color es únicamente una ayuda visual." : "La extensión de cada barra representa el tiempo programado de la Actividad. El relleno interior muestra su avance técnico calculado desde los indicadores. El color es únicamente una ayuda visual y no modifica estados, ponderaciones ni porcentajes."}</p></div>
       <div id="plannerContent">
         ${view === "cronograma"
-          ? timelineHTML({ project, activities, metrics, range, scale })
-          : matrixHTML({ activities, metrics, indicators, evidence, budgetItems })}
+          ? timelineHTML({ project, activities, metrics, range, scale, unitMode })
+          : matrixHTML({ activities, metrics, indicators, evidence, budgetItems, unitMode })}
       </div>
     </section>`;
 
