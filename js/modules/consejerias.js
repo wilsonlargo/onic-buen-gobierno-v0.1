@@ -1,13 +1,13 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.10";
-import { updateWithVersion } from "../security.js?v=5.4.10";
-import { openModal, closeModal } from "../components/modal.js?v=5.4.10";
-import { renderConsejeriaWorkspace } from "./consejeriaWorkspace.js?v=5.4.10";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.16";
+import { updateWithVersion } from "../security.js?v=5.4.16";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.16";
+import { renderConsejeriaWorkspace } from "./consejeriaWorkspace.js?v=5.4.16";
 import {
   getConsejeriaProgressMap,
   formatConsejeriaProgress,
   getConsejeriaProgressState
-} from "./consejeriaProgress.js?v=5.4.10";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.4.10";
+} from "./consejeriaProgress.js?v=5.4.16";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.16";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -1170,6 +1170,7 @@ export async function renderConsejerias(container, navigationTarget = null) {
 
                 <div class="row-actions vc-card-actions">
                   <button class="btn btn-secondary edit-vigencia-consejeria" type="button" data-id="${item.id}">Editar datos de la vigencia</button>
+                  <button class="btn btn-secondary open-consejeria-planner" type="button" data-id="${item.id}">Planeador</button>
                   <button class="btn btn-primary open-consejeria-workspace" type="button" data-id="${item.id}">Ver Consejería</button>
                 </div>
               </article>
@@ -1182,6 +1183,13 @@ export async function renderConsejerias(container, navigationTarget = null) {
         button.addEventListener("click", async () => {
           const record = vinculadas.find((item) => item.id === button.dataset.id);
           await openWorkspace(record);
+        });
+      });
+
+      linkedContainer.querySelectorAll(".open-consejeria-planner").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const record = vinculadas.find((item) => item.id === button.dataset.id);
+          await openWorkspace(record, { initialTab: "planeador" });
         });
       });
 

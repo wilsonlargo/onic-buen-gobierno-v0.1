@@ -1,13 +1,18 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.10";
-import { updateWithVersion } from "../security.js?v=5.4.10";
-import { openModal, closeModal } from "../components/modal.js?v=5.4.10";
-import { setAuditContext } from "./auditoria.js?v=5.4.10";
-import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.10";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.16";
+import { updateWithVersion, logManualEvent } from "../security.js?v=5.4.16";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.16";
+import { setAuditContext } from "./auditoria.js?v=5.4.16";
+import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.16";
 import {
   formatConsejeriaProgress,
   getConsejeriaProgressState
-} from "./consejeriaProgress.js?v=5.4.10";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.4.10";
+} from "./consejeriaProgress.js?v=5.4.16";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.16";
+import {
+  getConsejeriaPlannerData,
+  renderConsejeriaPlanner,
+  exportConsejeriaPlanner
+} from "./consejeriaPlanner.js?v=5.4.16";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -933,7 +938,7 @@ async function getPlanningStructure(vigenciaConsejeriaId) {
   if (projectIds.length) {
     const { data, error } = await supabase
       .from("actividades")
-      .select("id,proyecto_id,codigo,nombre,descripcion,responsable,fecha_inicio,fecha_fin,estado,orden")
+      .select("id,proyecto_id,codigo,nombre,descripcion,responsable,fecha_inicio,fecha_fin,estado,orden,planeador_color")
       .in("proyecto_id", projectIds)
       .order("orden", { ascending: true })
       .order("nombre", { ascending: true });
@@ -1025,6 +1030,12 @@ export async function renderConsejeriaWorkspace(
   let assignedMandateIds = [];
   let documents = [];
   let planningStructure = { lineas: [] };
+  let plannerItems = [];
+  let plannerView = "matriz";
+  let plannerScale = "trimestral";
+  let plannerZoom = 100;
+  let plannerFit = false;
+  let plannerFilters = { search: "", linea: "", programa: "", estado: "", responsable: "" };
 
   let mandateSearch = "";
   let mandateFilter = "todos";
@@ -1044,6 +1055,8 @@ export async function renderConsejeriaWorkspace(
       getDocuments(currentRecord.id),
       getPlanningStructure(currentRecord.id)
     ]);
+
+    plannerItems = await getConsejeriaPlannerData(planningStructure);
   }
 
   function showToast(text) {
@@ -1228,6 +1241,10 @@ export async function renderConsejeriaWorkspace(
         <button type="button" data-consejeria-tab="estructura" class="${activeTab === "estructura" ? "active" : ""}">
           Estructura
           <span>${totals.lineas}</span>
+        </button>
+        <button type="button" data-consejeria-tab="planeador" class="${activeTab === "planeador" ? "active" : ""}">
+          Planeador
+          <span>${plannerItems.length}</span>
         </button>
         <button type="button" data-consejeria-tab="perfil" class="${activeTab === "perfil" ? "active" : ""}">
           Perfil de vigencia
@@ -1525,6 +1542,88 @@ export async function renderConsejeriaWorkspace(
 
         window.dispatchEvent(new CustomEvent("app:navigate", { detail: { view, target } }));
       });
+    });
+  }
+
+  function renderPlanner() {
+    const body = container.querySelector("#consejeriaWorkspaceBody");
+    const c = currentRecord.consejerias || {};
+
+    renderConsejeriaPlanner({
+      container: body,
+      items: plannerItems,
+      vigencia,
+      consejeria: c.nombre_corto || c.nombre_largo || "Consejería",
+      view: plannerView,
+      scale: plannerScale,
+      zoom: plannerZoom,
+      fit: plannerFit,
+      filters: plannerFilters,
+      onViewChange: (view) => {
+        plannerView = view;
+        renderPlanner();
+      },
+      onScaleChange: (scale) => {
+        plannerScale = scale;
+        renderPlanner();
+      },
+      onZoomChange: ({ zoom, fit }) => {
+        plannerZoom = Math.min(180, Math.max(60, Number(zoom) || 100));
+        plannerFit = Boolean(fit);
+        renderPlanner();
+      },
+      onFiltersChange: (filters) => {
+        plannerFilters = { ...plannerFilters, ...filters };
+        renderPlanner();
+      },
+      onOpenItem: (item) => {
+        const target = {
+          vigencia_id: vigencia.id,
+          vigencia_consejeria_id: currentRecord.id,
+          linea_id: item.linea_id,
+          programa_id: item.programa_id,
+          proyecto_id: item.proyecto_id,
+          actividad_id: item.id
+        };
+        window.dispatchEvent(new CustomEvent("app:navigate", { detail: { view: "proyectos", target } }));
+      },
+      onExport: async (format, options = {}) => {
+        const scope = options.scope === "cronograma" ? "cronograma" : "completo";
+        const exportItems = scope === "cronograma" ? (options.items || []) : plannerItems;
+        try {
+          await exportConsejeriaPlanner({
+            format,
+            items: exportItems,
+            vigencia,
+            consejeria: c.nombre_corto || c.nombre_largo || "Consejería",
+            scope,
+            scale: options.scale || plannerScale,
+            timelineElement: options.timelineElement || null,
+            filters: options.filters || {}
+          });
+          await logManualEvent({
+            action: "generar_documento",
+            entityType: "consejeria",
+            entityId: currentRecord.id,
+            entityName: c.nombre_corto || c.nombre_largo || "Consejería",
+            vigenciaId: vigencia.id,
+            vigenciaConsejeriaId: currentRecord.id,
+            detail: {
+              documento: "planeador",
+              alcance: scope === "cronograma" ? "vista_cronograma" : "consejeria_completa",
+              formato: format === "pdf" ? "PDF" : "Excel",
+              escala: scope === "cronograma" ? (options.scale || plannerScale) : "trimestral",
+              actividades: exportItems.length
+            }
+          });
+          showToast(scope === "cronograma"
+            ? `Vista del cronograma exportada en ${format === "pdf" ? "PDF" : "Excel"}.`
+            : `Planeador completo exportado en ${format === "pdf" ? "PDF" : "Excel"}.`);
+        } catch (error) {
+          console.error(error);
+          showToast(friendlyErrorMessage(error, scope === "cronograma" ? "No fue posible exportar la vista del cronograma." : "No fue posible exportar el Planeador completo."));
+        }
+      }
     });
   }
 
@@ -2683,6 +2782,7 @@ export async function renderConsejeriaWorkspace(
     const labels = {
       resumen: "Resumen",
       estructura: "Estructura",
+      planeador: "Planeador",
       perfil: "Perfil de vigencia",
       mandatos: "Mandatos",
       biblioteca: "Biblioteca"
@@ -2707,6 +2807,7 @@ export async function renderConsejeriaWorkspace(
       sectionOptions: [
         { value: "resumen", label: "Resumen", navigation: { consejeria_tab: "resumen" } },
         { value: "estructura", label: "Estructura", navigation: { consejeria_tab: "estructura" } },
+        { value: "planeador", label: "Planeador", navigation: { consejeria_tab: "planeador" } },
         { value: "perfil", label: "Perfil de vigencia", navigation: { consejeria_tab: "perfil" } },
         { value: "mandatos", label: "Mandatos", navigation: { consejeria_tab: "mandatos" } },
         { value: "biblioteca", label: "Biblioteca", navigation: { consejeria_tab: "biblioteca" } }
@@ -2732,6 +2833,8 @@ export async function renderConsejeriaWorkspace(
       renderSummary();
     } else if (activeTab === "estructura") {
       renderStructure();
+    } else if (activeTab === "planeador") {
+      renderPlanner();
     } else if (activeTab === "mandatos") {
       renderMandates();
     } else if (activeTab === "biblioteca") {

@@ -1,9 +1,9 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.10";
-import { updateWithVersion } from "../security.js?v=5.4.10";
-import { openModal, closeModal } from "../components/modal.js?v=5.4.10";
-import { renderProyectoWorkspace } from "./proyectoWorkspace.js?v=5.4.10";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.10";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.4.10";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.16";
+import { updateWithVersion } from "../security.js?v=5.4.16";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.16";
+import { renderProyectoWorkspace } from "./proyectoWorkspace.js?v=5.4.16";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.16";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.16";
 
 function escapeHTML(value = "") {
   return String(value ?? "")

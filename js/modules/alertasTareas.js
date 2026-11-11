@@ -1,13 +1,13 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.10";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.16";
 import {
   canManageGlobalStructure,
   getCurrentProfile,
   isReadOnlyUser,
   updateWithVersion
-} from "../security.js?v=5.4.10";
-import { openModal, closeModal } from "../components/modal.js?v=5.4.10";
-import { setAuditContext } from "./auditoria.js?v=5.4.10";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.4.10";
+} from "../security.js?v=5.4.16";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.16";
+import { setAuditContext } from "./auditoria.js?v=5.4.16";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.16";
 
 function escapeHTML(value = "") {
   return String(value ?? "")

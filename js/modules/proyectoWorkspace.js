@@ -1,10 +1,10 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.10";
-import { updateWithVersion, logManualEvent } from "../security.js?v=5.4.10";
-import { openModal, closeModal } from "../components/modal.js?v=5.4.10";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.10";
-import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.10";
-import { renderProjectPlanner, plannerColorOptions, exportProjectPlanner } from "./projectPlanner.js?v=5.4.10";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.4.10";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.16";
+import { updateWithVersion, logManualEvent } from "../security.js?v=5.4.16";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.16";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.16";
+import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.16";
+import { renderProjectPlanner, plannerColorOptions, exportProjectPlanner } from "./projectPlanner.js?v=5.4.16";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.16";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -1304,13 +1304,14 @@ export async function renderProyectoWorkspace(container, options) {
             }
           });
           await logManualEvent({
-            action: "exportar_planeador",
+            action: "generar_documento",
             entityType: "proyecto",
             entityId: project.id,
             entityName: project.nombre,
             vigenciaId: vigencia.id,
             vigenciaConsejeriaId: vigenciaConsejeria.id,
             detail: {
+              documento: "planeador",
               formato: format === "pdf" ? "PDF" : "Excel",
               vista: view === "cronograma" ? "Cronograma" : "Matriz",
               escala: view === "cronograma" ? (scale === "trimestral" ? "Trimestral" : "Mensual") : null
@@ -1748,13 +1749,14 @@ export async function renderProyectoWorkspace(container, options) {
             }
           });
           await logManualEvent({
-            action: "exportar_planeador",
+            action: "generar_documento",
             entityType: "proyecto",
             entityId: project.id,
             entityName: project.nombre,
             vigenciaId: vigencia.id,
             vigenciaConsejeriaId: vigenciaConsejeria.id,
             detail: {
+              documento: "planeador",
               tipo_unidad: "actividad_general",
               formato: format === "pdf" ? "PDF" : "Excel",
               vista: view === "cronograma" ? "Cronograma" : "Matriz",
