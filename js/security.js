@@ -1,4 +1,4 @@
-import { requireSupabase } from "./supabaseClient.js?v=5.3.0";
+import { requireSupabase } from "./supabaseClient.js?v=5.3.1";
 
 let currentProfile = null;
 let currentAssignments = [];
@@ -221,7 +221,7 @@ function mutationText(button) {
 }
 
 function applyReadOnly(root) {
-  const mutationPattern = /(^\+|\bnuevo\b|\bnueva\b|guardar|crear|editar|eliminar|retirar|vincular|archivar|reactivar|registrar avance|aprobar|restablecer|ponderación sugerida|completar restante|importar vigencia|importar$|borrar|inactivar|marcar como cancelada)/i;
+  const mutationPattern = /(^\+|\bnuevo\b|\bnueva\b|guardar|crear|editar|eliminar|retirar|vincular|archivar|reactivar|registrar avance|aprobar|restablecer|ponderación sugerida|completar restante|importar vigencia|importar$|borrar|inactivar|marcar como cancelada|activar|cerrar vigencia|reabrir)/i;
 
   root.querySelectorAll("button").forEach((button) => {
     const text = mutationText(button);
@@ -248,7 +248,9 @@ function applyConsejeriaRestrictions(viewName, root) {
       "#newVigenciaButton",
       "#importVigenciaJsonButton",
       ".backup-vigencia",
-      ".force-delete-vigencia"
+      ".force-delete-vigencia",
+      ".edit-vigencia",
+      ".edit-vigencia-state"
     ]);
   }
 

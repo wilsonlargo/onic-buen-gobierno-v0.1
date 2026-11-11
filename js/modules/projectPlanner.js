@@ -1,4 +1,4 @@
-import { uiIcon } from "../components/uiSystem.js?v=5.3.0";
+import { uiIcon } from "../components/uiSystem.js?v=5.3.1";
 const COLOR_OPTIONS = [
   { value: "", label: "Automático", hex: "#4f7f67" },
   { value: "verde", label: "Verde", hex: "#4f7f67" },

@@ -1,13 +1,13 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
-import { updateWithVersion } from "../security.js?v=5.3.0";
-import { openModal, closeModal } from "../components/modal.js?v=5.3.0";
-import { renderConsejeriaWorkspace } from "./consejeriaWorkspace.js?v=5.3.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
+import { updateWithVersion } from "../security.js?v=5.3.1";
+import { openModal, closeModal } from "../components/modal.js?v=5.3.1";
+import { renderConsejeriaWorkspace } from "./consejeriaWorkspace.js?v=5.3.1";
 import {
   getConsejeriaProgressMap,
   formatConsejeriaProgress,
   getConsejeriaProgressState
-} from "./consejeriaProgress.js?v=5.3.0";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.3.0";
+} from "./consejeriaProgress.js?v=5.3.1";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.3.1";
 
 function escapeHTML(value = "") {
   return String(value ?? "")

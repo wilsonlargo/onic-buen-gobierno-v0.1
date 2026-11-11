@@ -83,7 +83,7 @@ El `400` observado en consola durante la prueba de V5.1 correspondió a un token
 - Sintaxis verificada sobre todos los archivos JavaScript con `node --check`.
 - Rutas de importación relativas verificadas.
 - Recursos locales referenciados desde `index.html` verificados.
-- No quedan referencias de caché `v=5.2.0`; la versión usa `v=5.3.0`.
+- No quedan referencias de caché `v=5.2.0`; la versión usa `v=5.3.1`.
 - Balance de llaves CSS verificado.
 - `js/config.js` permanece sin cambios respecto de V5.2.
 - Se intentó una prueba automatizada con Chromium, pero el entorno bloquea el acceso del navegador a `localhost` (`ERR_BLOCKED_BY_ADMINISTRATOR`), por lo que la revisión visual final debe realizarse en el equipo local.

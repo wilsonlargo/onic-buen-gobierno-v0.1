@@ -1,6 +1,6 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.0";
-import { setAuditContext } from "./auditoria.js?v=5.3.0";
-import { uiIcon } from "../components/uiSystem.js?v=5.3.0";
+import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
+import { setAuditContext } from "./auditoria.js?v=5.3.1";
+import { uiIcon } from "../components/uiSystem.js?v=5.3.1";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
