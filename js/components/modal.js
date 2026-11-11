@@ -1,4 +1,4 @@
-import { confirmNavigationAway } from "./uiSystem.js?v=5.3.1";
+import { confirmNavigationAway } from "./uiSystem.js?v=5.4.2";
 
 const backdrop = document.querySelector("#modalBackdrop");
 const body = document.querySelector("#modalBody");

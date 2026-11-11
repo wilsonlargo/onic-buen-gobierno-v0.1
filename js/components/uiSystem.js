@@ -1,5 +1,5 @@
 /*
- * Sistema de interfaz V5.3
+ * Sistema de interfaz V5.4
  * Unifica iconografía, acciones, accesibilidad, contexto de navegación,
  * protección de cambios sin guardar y ayuda contextual sin alterar
  * la lógica de negocio de los módulos.

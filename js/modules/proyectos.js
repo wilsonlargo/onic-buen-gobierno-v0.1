@@ -1,9 +1,9 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
-import { updateWithVersion } from "../security.js?v=5.3.1";
-import { openModal, closeModal } from "../components/modal.js?v=5.3.1";
-import { renderProyectoWorkspace } from "./proyectoWorkspace.js?v=5.3.1";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.3.1";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.3.1";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
+import { updateWithVersion } from "../security.js?v=5.4.2";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.2";
+import { renderProyectoWorkspace } from "./proyectoWorkspace.js?v=5.4.2";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.2";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.2";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -82,6 +82,24 @@ function statusChip(estado) {
   };
 
   return `<span class="status-chip ${classes[estado] || ""}">${labels[estado] || escapeHTML(estado)}</span>`;
+}
+
+function unitType(record) {
+  return record?.tipo_unidad === "actividad_general" ? "actividad_general" : "proyecto";
+}
+
+function unitTypeLabel(record) {
+  return unitType(record) === "actividad_general" ? "Actividad general" : "Proyecto";
+}
+
+function unitTypeChip(record) {
+  const type = unitType(record);
+  return `<span class="unit-type-chip ${type === "actividad_general" ? "activity" : "project"}">${type === "actividad_general" ? "Actividad general" : "Proyecto"}</span>`;
+}
+
+function projectStateToActivityState(estado) {
+  const map = { borrador: "borrador", formulacion: "programada", activo: "en_ejecucion", suspendido: "suspendida", cerrado: "completada" };
+  return map[estado] || "borrador";
 }
 
 function trashIcon() {
@@ -358,6 +376,132 @@ async function updateProyecto(record, payload, mandatoIds = null) {
   return data;
 }
 
+async function createActividadGeneral(payload, mandatoIds = []) {
+  const supabase = requireSupabase();
+  let proyecto = null;
+  let actividad = null;
+  try {
+    proyecto = await createProyecto({ ...payload, tipo_unidad: "actividad_general" }, mandatoIds);
+    const { data: createdActivity, error: activityError } = await supabase
+      .from("actividades")
+      .insert({
+        proyecto_id: proyecto.id,
+        codigo: proyecto.codigo,
+        nombre: proyecto.nombre,
+        descripcion: proyecto.descripcion || proyecto.objetivo_general || null,
+        responsable: proyecto.responsable,
+        fecha_inicio: proyecto.fecha_inicio,
+        fecha_fin: proyecto.fecha_fin,
+        estado: projectStateToActivityState(proyecto.estado),
+        orden: 0
+      })
+      .select()
+      .single();
+    if (activityError) throw activityError;
+    actividad = createdActivity;
+    const { data: updated, error: updateError } = await supabase
+      .from("proyectos")
+      .update({ actividad_principal_id: actividad.id })
+      .eq("id", proyecto.id)
+      .select()
+      .single();
+    if (updateError) throw updateError;
+    return updated;
+  } catch (error) {
+    if (actividad?.id) {
+      try { await supabase.from("actividades").delete().eq("id", actividad.id); } catch (_) {}
+    }
+    if (proyecto?.id) {
+      try { await supabase.from("proyectos").delete().eq("id", proyecto.id); } catch (_) {}
+    }
+    throw error;
+  }
+}
+
+async function getProjectActivities(projectId) {
+  const supabase = requireSupabase();
+  const { data, error } = await supabase
+    .from("actividades")
+    .select("*")
+    .eq("proyecto_id", projectId)
+    .order("orden", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function convertProyectoToActividadGeneral(record) {
+  const activities = await getProjectActivities(record.id);
+  const currentActivities = activities.filter((activity) => activity.estado !== "cancelada");
+
+  if (currentActivities.length > 1) {
+    const error = new Error("MULTIPLE_ACTIVITIES");
+    error.code = "MULTIPLE_ACTIVITIES";
+    error.activityCount = currentActivities.length;
+    error.historicalCount = activities.length - currentActivities.length;
+    throw error;
+  }
+
+  const supabase = requireSupabase();
+  let principal = currentActivities[0] || null;
+  let createdPrincipal = false;
+  try {
+    if (!principal) {
+      const { data, error } = await supabase
+        .from("actividades")
+        .insert({
+          proyecto_id: record.id,
+          codigo: record.codigo,
+          nombre: record.nombre,
+          descripcion: record.descripcion || record.objetivo_general || null,
+          responsable: record.responsable,
+          fecha_inicio: record.fecha_inicio,
+          fecha_fin: record.fecha_fin,
+          estado: projectStateToActivityState(record.estado),
+          orden: 0
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      principal = data;
+      createdPrincipal = true;
+    }
+
+    return await updateProyecto(record, { tipo_unidad: "actividad_general", actividad_principal_id: principal.id });
+  } catch (error) {
+    if (createdPrincipal && principal?.id) {
+      try { await supabase.from("actividades").delete().eq("id", principal.id); } catch (_) {}
+    }
+    throw error;
+  }
+}
+
+async function convertActividadGeneralToProyecto(record) {
+  return updateProyecto(record, { tipo_unidad: "proyecto", actividad_principal_id: null });
+}
+
+async function syncGeneralActivityFromProject(project, activityId) {
+  if (!activityId) return;
+  const supabase = requireSupabase();
+  const { data: activity, error: readError } = await supabase.from("actividades").select("*").eq("id", activityId).single();
+  if (readError) throw readError;
+  await updateWithVersion({
+    table: "actividades",
+    record: activity,
+    payload: {
+      codigo: project.codigo,
+      nombre: project.nombre,
+      descripcion: project.descripcion || project.objetivo_general || null,
+      responsable: project.responsable,
+      fecha_inicio: project.fecha_inicio,
+      fecha_fin: project.fecha_fin,
+      estado: projectStateToActivityState(project.estado)
+    },
+    entityType: "Actividad general",
+    entityName: project.nombre
+  });
+}
+
 async function getActividadCount(projectId) {
   const supabase = requireSupabase();
 
@@ -468,12 +612,15 @@ function openProyectoForm({
   programa,
   mandatos,
   record = null,
+  unitTypeRequested = "proyecto",
   onSaved
 }) {
   const editing = Boolean(record);
+  const selectedType = editing ? unitType(record) : (unitTypeRequested === "actividad_general" ? "actividad_general" : "proyecto");
+  const unitLabel = selectedType === "actividad_general" ? "Actividad general" : "Proyecto";
 
   openModal({
-    title: editing ? "Editar proyecto" : "Nuevo proyecto",
+    title: editing ? `Editar ${unitLabel.toLocaleLowerCase("es")}` : `Nueva ${unitLabel.toLocaleLowerCase("es")}`,
     content: `
       <div class="context-ribbon project-context-ribbon">
         <div>
@@ -498,6 +645,11 @@ function openProyectoForm({
       </div>
 
       <form id="proyectoForm">
+        <div class="unit-type-callout ${selectedType}">
+          <strong>${unitLabel}</strong>
+          <p>${selectedType === "actividad_general" ? "Se mide directamente con Indicadores, Seguimiento, Evidencias y Presupuesto. No necesita crear Actividades adicionales." : "Agrupa una o varias Actividades. Su avance se consolida desde las Actividades y sus Indicadores."}</p>
+        </div>
+        <input type="hidden" name="tipo_unidad" value="${selectedType}">
         <div class="form-grid">
           <div class="form-field">
             <label for="proyectoCodigo">Código</label>
@@ -520,7 +672,7 @@ function openProyectoForm({
           </div>
 
           <div class="form-field full">
-            <label for="proyectoNombre">Nombre del Proyecto</label>
+            <label for="proyectoNombre">Nombre de la unidad</label>
             <input
               id="proyectoNombre"
               name="nombre"
@@ -586,7 +738,7 @@ function openProyectoForm({
           </div>
 
           <div class="form-field">
-            <label for="proyectoPonderacion">Ponderación del Proyecto</label>
+            <label for="proyectoPonderacion">Ponderación de la unidad</label>
 
             <div class="percent-input">
               <input
@@ -647,7 +799,7 @@ function openProyectoForm({
             <label>Mandatos relacionados</label>
             <p class="field-help">
               Se muestran los Mandatos asignados a esta Consejería para la Vigencia.
-              Un Proyecto puede contribuir a uno o varios.
+              La unidad puede contribuir a uno o varios.
             </p>
 
             ${mandateChecks(
@@ -665,7 +817,7 @@ function openProyectoForm({
           </button>
 
           <button class="btn btn-primary" type="submit">
-            ${editing ? "Guardar cambios" : "Crear Proyecto"}
+            ${editing ? "Guardar cambios" : `Crear ${unitLabel}`}
           </button>
         </div>
       </form>
@@ -714,11 +866,12 @@ function openProyectoForm({
         financed.checked && formData.get("valor_estimado") !== ""
           ? Number(formData.get("valor_estimado"))
           : null,
-      orden: Number(formData.get("orden") || 0)
+      orden: Number(formData.get("orden") || 0),
+      tipo_unidad: selectedType
     };
 
     if (!payload.nombre) {
-      message.textContent = "El nombre del Proyecto es obligatorio.";
+      message.textContent = `El nombre de ${selectedType === "actividad_general" ? "la Actividad general" : "el Proyecto"} es obligatorio.`;
       return;
     }
 
@@ -748,16 +901,14 @@ function openProyectoForm({
 
     try {
       if (editing) {
-        await updateProyecto(
-          record,
-          payload,
-          selectedMandates
-        );
+        const updated = await updateProyecto(record, payload, selectedMandates);
+        if (selectedType === "actividad_general" && updated?.actividad_principal_id) {
+          await syncGeneralActivityFromProject(updated, updated.actividad_principal_id);
+        }
+      } else if (selectedType === "actividad_general") {
+        await createActividadGeneral(payload, selectedMandates);
       } else {
-        await createProyecto(
-          payload,
-          selectedMandates
-        );
+        await createProyecto(payload, selectedMandates);
       }
 
       closeModal();
@@ -765,12 +916,12 @@ function openProyectoForm({
     } catch (error) {
       console.error(error);
       message.textContent =
-        friendlyErrorMessage(error, "No fue posible guardar el Proyecto.");
+        friendlyErrorMessage(error, `No fue posible guardar ${selectedType === "actividad_general" ? "la Actividad general" : "el Proyecto"}.`);
 
       submit.disabled = false;
       submit.textContent = editing
         ? "Guardar cambios"
-        : "Crear Proyecto";
+        : `Crear ${unitLabel}`;
     }
   });
 
@@ -781,19 +932,95 @@ function openProyectoForm({
    BORRADO SEGURO
    ========================================================== */
 
+function openNewUnitChooser({ onProject, onActivity }) {
+  openModal({
+    title: "Agregar al Programa",
+    content: `
+      <div class="unit-choice-grid">
+        <button id="chooseProjectUnit" class="unit-choice-card" type="button"><strong>Proyecto</strong><span>Agrupa una o varias Actividades y consolida su seguimiento.</span></button>
+        <button id="chooseActivityUnit" class="unit-choice-card" type="button"><strong>Actividad general</strong><span>Se mide directamente con Indicadores, Seguimiento, Evidencias y Presupuesto.</span></button>
+      </div>
+      <div class="form-actions"><button id="cancelUnitChooser" class="btn btn-secondary" type="button">Cancelar</button></div>`
+  });
+  document.querySelector("#cancelUnitChooser")?.addEventListener("click", closeModal);
+  document.querySelector("#chooseProjectUnit")?.addEventListener("click", () => { closeModal(); onProject(); });
+  document.querySelector("#chooseActivityUnit")?.addEventListener("click", () => { closeModal(); onActivity(); });
+}
+
+function openConvertUnitDialog({ record, onChanged }) {
+  const isGeneral = unitType(record) === "actividad_general";
+  const targetLabel = isGeneral ? "Proyecto" : "Actividad general";
+  openModal({
+    title: `Convertir en ${targetLabel}`,
+    content: `
+      <div class="conversion-summary">${unitTypeChip(record)}<strong>${escapeHTML(record.nombre)}</strong><p>${isGeneral ? "La Actividad general pasará a ser un Proyecto. Sus indicadores, evidencias, presupuesto y seguimientos se conservarán dentro de su Actividad operativa." : "El Proyecto pasará a seguimiento directo. Si no tiene Actividades vigentes se creará su soporte operativo automáticamente; si tiene una sola, se conservará íntegramente."}</p></div>
+      ${!isGeneral ? `<div class="notice"><strong>Protección de información</strong><p>Solo cuentan las Actividades vigentes. Las Actividades canceladas se conservan como histórico y no bloquean la conversión. Si existen más de una Actividad vigente, el Sistema detendrá la conversión para no alterar el cálculo ni la trazabilidad.</p></div>` : ""}
+      <p id="convertUnitMessage" class="form-message"></p>
+      <div class="form-actions"><button id="cancelConvertUnit" class="btn btn-secondary" type="button">Cancelar</button><button id="confirmConvertUnit" class="btn btn-primary" type="button">Convertir</button></div>`
+  });
+  document.querySelector("#cancelConvertUnit")?.addEventListener("click", closeModal);
+  document.querySelector("#confirmConvertUnit")?.addEventListener("click", async () => {
+    const button = document.querySelector("#confirmConvertUnit");
+    const message = document.querySelector("#convertUnitMessage");
+    button.disabled = true; button.textContent = "Convirtiendo…"; message.textContent = "";
+    try {
+      if (isGeneral) await convertActividadGeneralToProyecto(record);
+      else await convertProyectoToActividadGeneral(record);
+      closeModal();
+      if (typeof onChanged === "function") await onChanged();
+    } catch (error) {
+      console.error(error);
+      message.textContent = error?.code === "MULTIPLE_ACTIVITIES"
+        ? `Este Proyecto contiene ${error.activityCount} Actividades vigentes${error.historicalCount ? ` y ${error.historicalCount} cancelada${error.historicalCount === 1 ? "" : "s"}` : ""}. No se modificó nada; primero requiere consolidación de las Actividades vigentes.`
+        : friendlyErrorMessage(error, "No fue posible convertir la unidad.");
+      button.disabled = false; button.textContent = "Convertir";
+    }
+  });
+}
+
+async function getGeneralActivityDependencyCounts(activityId) {
+  if (!activityId) return { indicators: 0, budget: 0, evidence: 0, followups: 0 };
+  const supabase = requireSupabase();
+  const [indicators, budget, evidence, followups] = await Promise.all([
+    supabase.from("indicadores_actividad").select("id", { count: "exact", head: true }).eq("actividad_id", activityId),
+    supabase.from("presupuesto_actividad_rubros").select("id", { count: "exact", head: true }).eq("actividad_id", activityId),
+    supabase.from("evidencias_actividad").select("id", { count: "exact", head: true }).eq("actividad_id", activityId),
+    supabase.from("seguimientos_actividad").select("id", { count: "exact", head: true }).eq("actividad_id", activityId)
+  ]);
+  const result = { indicators, budget, evidence, followups };
+  for (const query of Object.values(result)) if (query.error) throw query.error;
+  return {
+    indicators: Number(indicators.count || 0),
+    budget: Number(budget.count || 0),
+    evidence: Number(evidence.count || 0),
+    followups: Number(followups.count || 0)
+  };
+}
+
 async function openDeleteProyectoDialog({ record, onChanged }) {
+  const isGeneral = unitType(record) === "actividad_general";
+  const unitName = isGeneral ? "Actividad general" : "Proyecto";
   let activityCount = 0;
+  let removablePrincipalId = null;
 
   try {
     activityCount = await getActividadCount(record.id);
+    if (isGeneral && activityCount === 1 && record.actividad_principal_id) {
+      const usage = await getGeneralActivityDependencyCounts(record.actividad_principal_id);
+      const totalUsage = usage.indicators + usage.budget + usage.evidence + usage.followups;
+      if (totalUsage === 0) {
+        removablePrincipalId = record.actividad_principal_id;
+        activityCount = 0;
+      }
+    }
   } catch (error) {
     console.error(error);
 
     openModal({
-      title: "Eliminar Proyecto",
+      title: `Eliminar ${unitName}`,
       content: `
         <div class="danger-callout">
-          <strong>No se pudo verificar la estructura del Proyecto.</strong>
+          <strong>No se pudo verificar la estructura de la unidad.</strong>
           <p>Por seguridad, la eliminación queda bloqueada.</p>
         </div>
         <div class="form-actions">
@@ -808,13 +1035,13 @@ async function openDeleteProyectoDialog({ record, onChanged }) {
 
   if (activityCount > 0) {
     openModal({
-      title: "El Proyecto tiene Actividades",
+      title: isGeneral ? "La Actividad general tiene seguimiento" : "El Proyecto tiene Actividades",
       content: `
         <div class="danger-callout">
           <strong>${escapeHTML(record.nombre)}</strong>
-          <p>Este Proyecto contiene <strong>${activityCount} ${activityCount === 1 ? "Actividad" : "Actividades"}</strong> y ya forma parte de la estructura operativa. No puede eliminarse físicamente.</p>
+          <p>${isGeneral ? "Esta Actividad general ya contiene información de seguimiento y debe conservarse para mantener su trazabilidad." : `Este Proyecto contiene <strong>${activityCount} ${activityCount === 1 ? "Actividad" : "Actividades"}</strong> y ya forma parte de la estructura operativa. No puede eliminarse físicamente.`}</p>
         </div>
-        <p class="muted">Conserva el Proyecto para mantener indicadores, presupuesto, evidencias y seguimientos.</p>
+        <p class="muted">Conserva la unidad para mantener indicadores, presupuesto, evidencias y seguimientos.</p>
         <div class="form-actions">
           <button id="closeProjectWithActivities" class="btn btn-secondary" type="button">Cerrar</button>
         </div>
@@ -831,21 +1058,21 @@ async function openDeleteProyectoDialog({ record, onChanged }) {
 
   if (!canHardDelete) {
     openModal({
-      title: "El Proyecto debe conservarse",
+      title: `La ${isGeneral ? "Actividad general" : "unidad"} debe conservarse`,
       content: `
         <div class="danger-callout">
           <strong>${escapeHTML(record.nombre)}</strong>
 
           <p>
-            Este Proyecto ya está en estado
+            Esta unidad ya está en estado
             <strong>${escapeHTML(record.estado)}</strong>.
             Para conservar la trazabilidad institucional no puede eliminarse físicamente.
           </p>
         </div>
 
         <p class="muted">
-          Los Proyectos en ejecución, suspendidos o cerrados forman parte del historial
-          del Programa. Puedes conservar su estado o cerrarlo cuando corresponda.
+          Las unidades en ejecución, suspendidas o cerradas forman parte del historial
+          del Programa. Puedes conservar su estado o cerrarla cuando corresponda.
         </p>
 
         <p id="protectedProjectMessage" class="form-message"></p>
@@ -888,7 +1115,7 @@ async function openDeleteProyectoDialog({ record, onChanged }) {
         } catch (error) {
           console.error(error);
           message.textContent =
-            friendlyErrorMessage(error, "No fue posible cerrar el Proyecto.");
+            friendlyErrorMessage(error, "No fue posible cerrar la unidad.");
 
           closeRecord.disabled = false;
           closeRecord.textContent = "Marcar como cerrado";
@@ -900,13 +1127,13 @@ async function openDeleteProyectoDialog({ record, onChanged }) {
   }
 
   openModal({
-    title: "Eliminar Proyecto",
+    title: `Eliminar ${unitName}`,
     content: `
       <div class="danger-callout">
         <strong>${escapeHTML(record.codigo || record.nombre)}</strong>
 
         <p>
-          Este Proyecto está en ${escapeHTML(record.estado)} y puede eliminarse
+          Esta ${isGeneral ? "Actividad general" : "unidad"} está en ${escapeHTML(record.estado)} y puede eliminarse
           definitivamente. También se eliminarán sus vínculos con Mandatos.
         </p>
       </div>
@@ -969,7 +1196,7 @@ async function openDeleteProyectoDialog({ record, onChanged }) {
 
       const { data: current, error } = await supabase
         .from("proyectos")
-        .select("estado")
+        .select("estado,tipo_unidad,actividad_principal_id")
         .eq("id", record.id)
         .single();
 
@@ -983,13 +1210,17 @@ async function openDeleteProyectoDialog({ record, onChanged }) {
         );
       }
 
+      if (removablePrincipalId) {
+        const { error: activityDeleteError } = await supabase.from("actividades").delete().eq("id", removablePrincipalId);
+        if (activityDeleteError) throw activityDeleteError;
+      }
       await deleteProyecto(record.id);
       closeModal();
       await onChanged();
     } catch (error) {
       console.error(error);
       message.textContent =
-        friendlyErrorMessage(error, "No fue posible eliminar el Proyecto.");
+        friendlyErrorMessage(error, "No fue posible eliminar la unidad.");
 
       confirm.disabled = false;
       confirm.textContent = "Eliminar definitivamente";
@@ -1009,12 +1240,13 @@ function mandateLabels(record) {
 
 async function copyProyectosToClipboard(proyectos) {
   if (!proyectos.length) {
-    throw new Error("No hay Proyectos para copiar.");
+    throw new Error("No hay unidades para copiar.");
   }
 
   const headers = [
     "codigo",
     "nombre",
+    "tipo_unidad",
     "nombre_corto",
     "descripcion",
     "objetivo_general",
@@ -1035,6 +1267,7 @@ async function copyProyectosToClipboard(proyectos) {
     ...proyectos.map((proyecto) => [
       proyecto.codigo || "",
       proyecto.nombre || "",
+      unitType(proyecto),
       proyecto.nombre_corto || "",
       proyecto.descripcion || "",
       proyecto.objetivo_general || "",
@@ -1237,9 +1470,15 @@ function normalizeImportRow(raw) {
     estado = "borrador";
   }
 
+  const rawType = normalizeText(pick("tipo_unidad", "tipo", "clase", "unidad"));
+  const tipo_unidad = ["actividad", "actividad_general", "actividad general", "general"].includes(rawType)
+    ? "actividad_general"
+    : "proyecto";
+
   return {
     codigo: String(pick("codigo", "código") || "").trim(),
-    nombre: String(pick("nombre", "proyecto") || "").trim(),
+    nombre: String(pick("nombre", "proyecto", "actividad") || "").trim(),
+    tipo_unidad,
     nombre_corto: String(
       pick("nombre_corto", "corto", "sigla") || ""
     ).trim(),
@@ -1444,7 +1683,7 @@ function importPreview(rows) {
           <tr>
             <th>#</th>
             <th>Código</th>
-            <th>Proyecto</th>
+            <th>Unidad</th>
             <th>Estado</th>
             <th>Ponderación</th>
             <th>Mandatos</th>
@@ -1457,7 +1696,7 @@ function importPreview(rows) {
             <tr class="${row.valid ? "" : "row-error"}">
               <td>${row.index}</td>
               <td>${escapeHTML(row.codigo || "—")}</td>
-              <td>${escapeHTML(row.nombre || "—")}</td>
+              <td><strong>${escapeHTML(row.nombre || "—")}</strong><small class="import-unit-type">${row.tipo_unidad === "actividad_general" ? "Actividad general" : "Proyecto"}</small></td>
               <td>${escapeHTML(row.estado)}</td>
               <td>${formatPercent(row.ponderacion)}</td>
               <td>${escapeHTML(row.mandatos || "—")}</td>
@@ -1493,7 +1732,7 @@ function openImportProyectos({
   let validatedRows = [];
 
   openModal({
-    title: "Importar Proyectos",
+    title: "Importar Proyectos / Actividades",
     content: `
       <div class="context-ribbon project-context-ribbon">
         <div>
@@ -1570,12 +1809,13 @@ function openImportProyectos({
         <strong>Encabezados recomendados</strong>
 
         <code>
-          codigo | nombre | nombre_corto | descripcion | objetivo_general |
+          codigo | nombre | tipo_unidad | nombre_corto | descripcion | objetivo_general |
           responsable | fecha_inicio | fecha_fin | estado | tiene_financiacion |
           valor_estimado | ponderacion | mandatos | orden
         </code>
 
         <p>
+          En <strong>tipo_unidad</strong> usa <strong>proyecto</strong> o <strong>actividad_general</strong>.
           Para varios Mandatos usa <strong>|</strong> o <strong>;</strong>.
           La coincidencia se hace por código o título del Mandato.
         </p>
@@ -1626,7 +1866,7 @@ function openImportProyectos({
     confirm.disabled = validCount === 0;
 
     confirm.textContent = validCount
-      ? `Importar ${validCount} ${validCount === 1 ? "Proyecto" : "Proyectos"}`
+      ? `Importar ${validCount} ${validCount === 1 ? "unidad" : "unidades"}`
       : "Importar registros válidos";
   }
 
@@ -1700,31 +1940,26 @@ function openImportProyectos({
       let imported = 0;
 
       for (const row of validRows) {
-        await createProyecto(
-          {
-            programa_id: programa.id,
-            codigo: row.codigo || null,
-            nombre: row.nombre,
-            nombre_corto: row.nombre_corto || null,
-            descripcion: row.descripcion || null,
-            objetivo_general:
-              row.objetivo_general || null,
-            responsable: row.responsable || null,
-            fecha_inicio: row.fecha_inicio || null,
-            fecha_fin: row.fecha_fin || null,
-            estado: row.estado,
-            tiene_financiacion:
-              row.tiene_financiacion,
-            valor_estimado:
-              row.tiene_financiacion
-                ? row.valor_estimado
-                : null,
-            metodo_ponderacion: "manual",
-            ponderacion: row.ponderacion,
-            orden: row.orden
-          },
-          row.mandateIds
-        );
+        const payload = {
+          programa_id: programa.id,
+          codigo: row.codigo || null,
+          nombre: row.nombre,
+          nombre_corto: row.nombre_corto || null,
+          descripcion: row.descripcion || null,
+          objetivo_general: row.objetivo_general || null,
+          responsable: row.responsable || null,
+          fecha_inicio: row.fecha_inicio || null,
+          fecha_fin: row.fecha_fin || null,
+          estado: row.estado,
+          tiene_financiacion: row.tiene_financiacion,
+          valor_estimado: row.tiene_financiacion ? row.valor_estimado : null,
+          metodo_ponderacion: "manual",
+          ponderacion: row.ponderacion,
+          orden: row.orden,
+          tipo_unidad: row.tipo_unidad
+        };
+        if (row.tipo_unidad === "actividad_general") await createActividadGeneral(payload, row.mandateIds);
+        else await createProyecto(payload, row.mandateIds);
 
         imported++;
       }
@@ -1754,6 +1989,7 @@ export async function renderProyectos(container, navigationTarget = null) {
   let programas = [];
   let proyectos = [];
   let mandatos = [];
+  let unitFilter = "todos";
 
   let selectedVigenciaId = "";
   let selectedVigenciaConsejeriaId = "";
@@ -1764,7 +2000,7 @@ export async function renderProyectos(container, navigationTarget = null) {
     <div class="page-actions">
       <div>
         <p class="eyebrow">Planeación operativa</p>
-        <h2>Proyectos</h2>
+        <h2>Proyectos / Actividades</h2>
       </div>
 
       <div class="page-action-group">
@@ -1782,7 +2018,7 @@ export async function renderProyectos(container, navigationTarget = null) {
         </button>
 
         <button id="newProjectButton" class="btn btn-primary" type="button" disabled>
-          + Nuevo proyecto
+          + Agregar
         </button>
       </div>
     </div>
@@ -1793,7 +2029,7 @@ export async function renderProyectos(container, navigationTarget = null) {
         <h2>Selecciona el Programa</h2>
 
         <p class="muted">
-          Cada Proyecto pertenece a un Programa específico. Selecciona
+          Cada Programa puede contener Proyectos o Actividades generales. Selecciona
           Vigencia, Consejería, Línea de Acción y Programa.
         </p>
       </div>
@@ -1832,17 +2068,22 @@ export async function renderProyectos(container, navigationTarget = null) {
     <section class="panel">
       <div class="panel-header">
         <div>
-          <p class="eyebrow">Proyectos del Programa</p>
-          <h2 id="projectsPanelTitle">Proyectos</h2>
+          <p class="eyebrow">Unidades del Programa</p>
+          <h2 id="projectsPanelTitle">Proyectos / Actividades</h2>
         </div>
 
         <span id="projectsCount" class="status-chip">0</span>
       </div>
 
+      <div class="unit-filter-tabs" role="tablist" aria-label="Filtrar unidades">
+        <button class="unit-filter-tab active" data-unit-filter="todos" type="button">Todos <span id="unitCountAll">0</span></button>
+        <button class="unit-filter-tab" data-unit-filter="proyecto" type="button">Proyectos <span id="unitCountProjects">0</span></button>
+        <button class="unit-filter-tab" data-unit-filter="actividad_general" type="button">Actividades generales <span id="unitCountActivities">0</span></button>
+      </div>
       <div id="projectsContent" style="margin-top: 18px">
         <div class="empty-state">
           <strong>Selecciona un Programa.</strong>
-          <p>Sus Proyectos aparecerán aquí.</p>
+          <p>Sus Proyectos y Actividades generales aparecerán aquí.</p>
         </div>
       </div>
     </section>
@@ -1960,7 +2201,7 @@ export async function renderProyectos(container, navigationTarget = null) {
     if (!vc || !linea || !programa) {
       summary.classList.add("hidden");
       summary.innerHTML = "";
-      title.textContent = "Proyectos";
+      title.textContent = "Proyectos / Actividades";
       return;
     }
 
@@ -1993,7 +2234,7 @@ export async function renderProyectos(container, navigationTarget = null) {
     `;
 
     title.textContent =
-      `Proyectos · ${programa.nombre}`;
+      `Proyectos / Actividades · ${programa.nombre}`;
   }
 
   async function loadVigencias() {
@@ -2231,7 +2472,7 @@ export async function renderProyectos(container, navigationTarget = null) {
     content.innerHTML = `
       <div class="empty-state">
         <strong>Selecciona un Programa.</strong>
-        <p>Sus Proyectos aparecerán aquí.</p>
+        <p>Sus Proyectos y Actividades generales aparecerán aquí.</p>
       </div>
     `;
 
@@ -2309,6 +2550,10 @@ export async function renderProyectos(container, navigationTarget = null) {
 
     count.textContent = String(proyectos.length);
     updateActions();
+    listView.querySelector("#unitCountAll").textContent = String(proyectos.length);
+    listView.querySelector("#unitCountProjects").textContent = String(proyectos.filter((item) => unitType(item) === "proyecto").length);
+    listView.querySelector("#unitCountActivities").textContent = String(proyectos.filter((item) => unitType(item) === "actividad_general").length);
+    listView.querySelectorAll("[data-unit-filter]").forEach((button) => button.classList.toggle("active", button.dataset.unitFilter === unitFilter));
 
     const vigencia = currentVigencia();
     const vc = currentConsejeria();
@@ -2322,7 +2567,7 @@ export async function renderProyectos(container, navigationTarget = null) {
         entidadId: programa.id,
         entidadNombre: programa.nombre,
         seccion: "proyectos",
-        ruta: `${vigencia.nombre} › ${vc.consejerias.nombre_corto} › ${linea.nombre} › ${programa.nombre} › Proyectos`,
+        ruta: `${vigencia.nombre} › ${vc.consejerias.nombre_corto} › ${linea.nombre} › ${programa.nombre} › Proyectos / Actividades`,
         navigation: {
           view: "proyectos",
           vigencia_id: vigencia.id,
@@ -2340,18 +2585,15 @@ export async function renderProyectos(container, navigationTarget = null) {
     if (!proyectos.length) {
       content.innerHTML = `
         <div class="empty-state">
-          <strong>Este Programa aún no tiene Proyectos.</strong>
-
-          <p>
-            Crea el primero o importa varios. La ponderación del Programa
-            se configurará desde los Proyectos.
-          </p>
+          <strong>Este Programa aún no tiene unidades de gestión.</strong>
+          <p>Crea un Proyecto o una Actividad general. La ponderación del Programa se distribuirá entre ambas clases de unidad.</p>
         </div>
       `;
 
       return;
     }
 
+    const visibleUnits = unitFilter === "todos" ? proyectos : proyectos.filter((item) => unitType(item) === unitFilter);
     const total = calculateWeightTotal(proyectos);
     const state = weightState(total);
     const financedTotal = proyectos.reduce(
@@ -2379,7 +2621,7 @@ export async function renderProyectos(container, navigationTarget = null) {
         </div>
 
         <div class="project-summary-stat">
-          <span>Proyectos</span>
+          <span>Unidades</span>
           <strong>${proyectos.length}</strong>
         </div>
 
@@ -2390,7 +2632,7 @@ export async function renderProyectos(container, navigationTarget = null) {
       </div>
 
       <div class="projects-grid">
-        ${proyectos.map((proyecto) => {
+        ${visibleUnits.map((proyecto) => {
           const mandates = mandateLabels(proyecto);
 
           return `
@@ -2401,14 +2643,14 @@ export async function renderProyectos(container, navigationTarget = null) {
                     ${escapeHTML(
                       proyecto.codigo ||
                       proyecto.nombre_corto ||
-                      `Proyecto ${Number(proyecto.orden || 0) + 1}`
+                      `${unitTypeLabel(proyecto)} ${Number(proyecto.orden || 0) + 1}`
                     )}
                   </p>
 
                   <h3>${escapeHTML(proyecto.nombre)}</h3>
                 </div>
 
-                ${statusChip(proyecto.estado)}
+                <div class="project-card-chips">${unitTypeChip(proyecto)}${statusChip(proyecto.estado)}</div>
               </div>
 
               <p class="muted project-card-description">
@@ -2433,13 +2675,13 @@ export async function renderProyectos(container, navigationTarget = null) {
                 <div class="calculation-item">
                   <span>Avance técnico</span>
                   <strong>—</strong>
-                  <small>Ver avance en Abrir proyecto</small>
+                  <small>Ver avance al abrir la unidad</small>
                 </div>
 
                 <div class="calculation-item">
                   <span>Contribución</span>
                   <strong>—</strong>
-                  <small>Calculada desde las actividades</small>
+                  <small>${unitType(proyecto) === "actividad_general" ? "Calculada desde sus indicadores" : "Calculada desde las Actividades"}</small>
                 </div>
 
                 <div class="calculation-item">
@@ -2490,7 +2732,7 @@ export async function renderProyectos(container, navigationTarget = null) {
                   type="button"
                   data-id="${proyecto.id}"
                 >
-                  Abrir proyecto
+                  Abrir ${unitType(proyecto) === "actividad_general" ? "actividad" : "proyecto"}
                 </button>
 
                 <button
@@ -2502,10 +2744,18 @@ export async function renderProyectos(container, navigationTarget = null) {
                 </button>
 
                 <button
+                  class="btn btn-secondary convert-unit"
+                  type="button"
+                  data-id="${proyecto.id}"
+                >
+                  ${unitType(proyecto) === "actividad_general" ? "Convertir en Proyecto" : "Convertir en Actividad"}
+                </button>
+
+                <button
                   class="icon-btn danger delete-project"
                   type="button"
                   data-id="${proyecto.id}"
-                  title="Eliminar Proyecto"
+                  title="Eliminar unidad"
                   aria-label="Eliminar ${escapeHTML(proyecto.nombre)}"
                 >
                   ${trashIcon()}
@@ -2520,10 +2770,9 @@ export async function renderProyectos(container, navigationTarget = null) {
         <strong>Regla de ponderación</strong>
 
         <p>
-          A diferencia de Líneas y Programas, la ponderación de los Proyectos
-          es modificable. El total de los Proyectos de este Programa debe sumar
-          exactamente 100,00 %. El avance técnico y la contribución se calculan
-          dentro de cada Proyecto a partir de sus Actividades e Indicadores.
+          A diferencia de Líneas y Programas, la ponderación de estas unidades es modificable.
+          Proyectos y Actividades generales comparten el mismo nivel dentro del Programa y su total debe sumar exactamente 100,00 %.
+          Los Proyectos consolidan sus Actividades; las Actividades generales se miden directamente con sus Indicadores.
         </p>
       </div>
     `;
@@ -2593,6 +2842,22 @@ export async function renderProyectos(container, navigationTarget = null) {
       });
 
     content
+      .querySelectorAll(".convert-unit")
+      .forEach((button) => {
+        button.addEventListener("click", () => {
+          const record = proyectos.find((item) => item.id === button.dataset.id);
+          if (!record) return;
+          openConvertUnitDialog({
+            record,
+            onChanged: async () => {
+              await refreshProjects();
+              showToast(unitType(record) === "actividad_general" ? "Actividad general convertida en Proyecto." : "Proyecto convertido en Actividad general.");
+            }
+          });
+        });
+      });
+
+    content
       .querySelectorAll(".delete-project")
       .forEach((button) => {
         button.addEventListener("click", () => {
@@ -2611,6 +2876,14 @@ export async function renderProyectos(container, navigationTarget = null) {
           });
         });
       });
+
+    listView.querySelectorAll("[data-unit-filter]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        if (button.dataset.unitFilter === unitFilter) return;
+        unitFilter = button.dataset.unitFilter;
+        await refreshProjects();
+      });
+    });
 
     if (navigationTarget?.proyecto_id) {
       const targetProject = proyectos.find(
@@ -2677,41 +2950,42 @@ export async function renderProyectos(container, navigationTarget = null) {
 
     if (vc.estado !== "activa") {
       showToast(
-        "La Consejería está inactiva. Reactívala antes de crear Proyectos."
+        "La Consejería está inactiva. Reactívala antes de agregar unidades."
       );
       return;
     }
 
     if (linea.estado !== "activa") {
       showToast(
-        "La Línea de Acción no está activa. Reactívala antes de crear Proyectos."
+        "La Línea de Acción no está activa. Reactívala antes de agregar unidades."
       );
       return;
     }
 
     if (programa.estado !== "activo") {
       showToast(
-        "El Programa no está activo. Reactívalo antes de crear Proyectos."
+        "El Programa no está activo. Reactívalo antes de agregar unidades."
       );
       return;
     }
 
-    openProyectoForm({
+    const openUnitForm = (requestedType) => openProyectoForm({
       vigencia,
       vigenciaConsejeria: vc,
       linea,
       programa,
       mandatos,
-
+      unitTypeRequested: requestedType,
       onSaved: async () => {
         await refreshProjects();
-
         const total = calculateWeightTotal(proyectos);
-
-        showToast(
-          `Proyecto creado. Ponderación actual del Programa: ${formatPercent(total)}.`
-        );
+        showToast(`${requestedType === "actividad_general" ? "Actividad general" : "Proyecto"} creado. Ponderación actual del Programa: ${formatPercent(total)}.`);
       }
+    });
+
+    openNewUnitChooser({
+      onProject: () => openUnitForm("proyecto"),
+      onActivity: () => openUnitForm("actividad_general")
     });
   });
 
@@ -2823,11 +3097,11 @@ export async function renderProyectos(container, navigationTarget = null) {
 
     content.innerHTML = `
       <div class="empty-state">
-        <strong>No fue posible cargar Proyectos.</strong>
+        <strong>No fue posible cargar Proyectos / Actividades.</strong>
 
         <p>
           ${escapeHTML(
-            friendlyErrorMessage(error, "No fue posible cargar los Proyectos. Intenta nuevamente o informa al administrador del Sistema.")
+            friendlyErrorMessage(error, "No fue posible cargar las unidades. Intenta nuevamente o informa al administrador del Sistema.")
           )}
         </p>
       </div>

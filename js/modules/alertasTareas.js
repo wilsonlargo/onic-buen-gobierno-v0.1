@@ -1,13 +1,13 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
 import {
   canManageGlobalStructure,
   getCurrentProfile,
   isReadOnlyUser,
   updateWithVersion
-} from "../security.js?v=5.3.1";
-import { openModal, closeModal } from "../components/modal.js?v=5.3.1";
-import { setAuditContext } from "./auditoria.js?v=5.3.1";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.3.1";
+} from "../security.js?v=5.4.2";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.2";
+import { setAuditContext } from "./auditoria.js?v=5.4.2";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.2";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -223,7 +223,7 @@ async function loadOperationalData(vigenciaId, vigenciaConsejeriaId = "") {
     "proyectos",
     "programa_id",
     programIds,
-    "id,programa_id,codigo,nombre,nombre_corto,estado,ponderacion,fecha_inicio,fecha_fin,responsable,orden"
+    "id,programa_id,codigo,nombre,nombre_corto,estado,ponderacion,fecha_inicio,fecha_fin,responsable,orden,tipo_unidad,actividad_principal_id"
   );
   const projectIds = proyectos.map((row) => row.id);
   const actividades = await getRowsIn(
@@ -385,8 +385,8 @@ function buildAlerts(vigencia, data) {
         key: `programa_sin_proyectos:${program.id}`,
         type: "programa_sin_proyectos",
         severity: "media",
-        title: "Programa activo sin Proyectos",
-        description: `El Programa “${program.nombre}” no tiene Proyectos registrados.`,
+        title: "Programa activo sin unidades",
+        description: `El Programa “${program.nombre}” no tiene Proyectos ni Actividades generales registrados.`,
         vigenciaConsejeriaId: ctx.vc?.id || null,
         entityType: "programa",
         entityId: program.id,
@@ -404,7 +404,7 @@ function buildAlerts(vigencia, data) {
         type: "ponderacion_incompleta",
         severity: "alta",
         title: "La ponderación del Programa no suma 100 %",
-        description: `La suma actual es ${formatPercent(totalWeight)}. Revisa y aprueba la ponderación de sus Proyectos.`,
+        description: `La suma actual es ${formatPercent(totalWeight)}. Revisa y aprueba la ponderación de sus unidades.`,
         vigenciaConsejeriaId: ctx.vc?.id || null,
         entityType: "programa",
         entityId: program.id,
@@ -425,7 +425,7 @@ function buildAlerts(vigencia, data) {
     const activities = activitiesByProject.get(project.id) || [];
     const route = routeText(vigencia.nombre, ctx);
 
-    if (!activities.length && project.estado !== "cerrado") {
+    if (project.tipo_unidad !== "actividad_general" && !activities.length && project.estado !== "cerrado") {
       alerts.push({
         key: `proyecto_sin_actividades:${project.id}`,
         type: "proyecto_sin_actividades",
@@ -482,6 +482,7 @@ function buildAlerts(vigencia, data) {
 
   planActivities.forEach((activity) => {
     const ctx = maps.contextForActivity(activity);
+    const isGeneral = ctx.project?.tipo_unidad === "actividad_general" && ctx.project?.actividad_principal_id === activity.id;
     const progress = activityProgress.get(activity.id);
     const route = routeText(vigencia.nombre, ctx);
     const days = daysBetweenToday(activity.fecha_fin);
@@ -492,17 +493,17 @@ function buildAlerts(vigencia, data) {
         key: `actividad_vencida:${activity.id}`,
         type: "actividad_vencida",
         severity: "alta",
-        title: "Actividad vencida con avance pendiente",
-        description: `La Actividad finalizó el ${formatDate(activity.fecha_fin)} y registra ${progress === null ? "avance sin medición completa" : formatPercent(progress)}.`,
+        title: `${isGeneral ? "Actividad general" : "Actividad"} vencida con avance pendiente`,
+        description: `La ${isGeneral ? "Actividad general" : "Actividad"} finalizó el ${formatDate(activity.fecha_fin)} y registra ${progress === null ? "avance sin medición completa" : formatPercent(progress)}.`,
         vigenciaConsejeriaId: ctx.vc?.id || null,
         entityType: "actividad",
         entityId: activity.id,
         entityName: activity.nombre,
         route,
         navigation: projectNavigation(vigencia.id, ctx, {
-          project_tab: "actividades",
+          project_tab: isGeneral ? "perfil" : "actividades",
           actividad_id: activity.id,
-          activity_tab: "seguimiento"
+          activity_tab: "avance"
         })
       });
     } else if (!completed && days !== null && days >= 0 && days <= 15) {
@@ -510,7 +511,7 @@ function buildAlerts(vigencia, data) {
         key: `actividad_proxima:${activity.id}`,
         type: "actividad_proxima",
         severity: "media",
-        title: "Actividad próxima a su fecha de cierre",
+        title: `${isGeneral ? "Actividad general" : "Actividad"} próxima a su fecha de cierre`,
         description: `Faltan ${days} día${days === 1 ? "" : "s"} para el cierre programado (${formatDate(activity.fecha_fin)}). Avance: ${progress === null ? "sin medición completa" : formatPercent(progress)}.`,
         vigenciaConsejeriaId: ctx.vc?.id || null,
         entityType: "actividad",
@@ -518,7 +519,7 @@ function buildAlerts(vigencia, data) {
         entityName: activity.nombre,
         route,
         navigation: projectNavigation(vigencia.id, ctx, {
-          project_tab: "planeador",
+          project_tab: isGeneral ? "perfil" : "planeador",
           actividad_id: activity.id,
           activity_tab: "general"
         })
@@ -530,15 +531,15 @@ function buildAlerts(vigencia, data) {
         key: `avance_sin_evidencia:${activity.id}`,
         type: "avance_sin_evidencia",
         severity: "media",
-        title: "Actividad con avance y sin Evidencias activas",
-        description: `La Actividad acredita ${formatPercent(progress)}, pero todavía no tiene Evidencias activas registradas.`,
+        title: `${isGeneral ? "Actividad general" : "Actividad"} con avance y sin Evidencias activas`,
+        description: `La ${isGeneral ? "Actividad general" : "Actividad"} acredita ${formatPercent(progress)}, pero todavía no tiene Evidencias activas registradas.`,
         vigenciaConsejeriaId: ctx.vc?.id || null,
         entityType: "actividad",
         entityId: activity.id,
         entityName: activity.nombre,
         route,
         navigation: projectNavigation(vigencia.id, ctx, {
-          project_tab: "actividades",
+          project_tab: isGeneral ? "perfil" : "actividades",
           actividad_id: activity.id,
           activity_tab: "evidencias"
         })
@@ -563,7 +564,7 @@ function buildAlerts(vigencia, data) {
       navigation: projectNavigation(vigencia.id, ctx, {
         project_tab: "actividades",
         actividad_id: activity.id,
-        activity_tab: "indicadores"
+        activity_tab: "avance"
       })
     };
 

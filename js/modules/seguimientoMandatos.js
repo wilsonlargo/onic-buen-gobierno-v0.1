@@ -1,6 +1,6 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.3.1";
-import { isConsejeriaUser } from "../security.js?v=5.3.1";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.2";
+import { isConsejeriaUser } from "../security.js?v=5.4.2";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -133,7 +133,7 @@ async function loadMandateTrackingData(vigenciaId) {
     "proyectos",
     "id",
     projectIds,
-    "id,programa_id,codigo,nombre,nombre_corto,estado,ponderacion,fecha_inicio,fecha_fin,orden"
+    "id,programa_id,codigo,nombre,nombre_corto,estado,ponderacion,fecha_inicio,fecha_fin,orden,tipo_unidad,actividad_principal_id"
   );
 
   const programIds = [...new Set(proyectos.map((row) => row.programa_id))];
@@ -294,29 +294,29 @@ function mandateState(item) {
   if (!item.projects.length) {
     return {
       key: "no-projects",
-      label: "Sin proyectos",
-      detail: "Todavía no tiene Proyectos vinculados dentro del ámbito consultado."
+      label: "Sin unidades",
+      detail: "Todavía no tiene unidades vinculadas dentro del ámbito consultado."
     };
   }
   if (!item.projectsInCalculation.length) {
     return {
       key: "outside",
       label: "Fuera del cálculo",
-      detail: "Los Proyectos vinculados no participan actualmente en el cálculo activo del Plan."
+      detail: "Las unidades vinculadas no participan actualmente en el cálculo activo del Plan."
     };
   }
   if (item.coverage === null || Number(item.coverage) <= 0) {
     return {
       key: "no-measurement",
       label: "Sin medición",
-      detail: "Los Proyectos vinculados todavía no acreditan medición técnica."
+      detail: "Las unidades vinculadas todavía no acreditan medición técnica."
     };
   }
   if (Number(item.coverage) < 99.995) {
     return {
       key: "partial",
       label: "Medición parcial",
-      detail: "Parte de los Proyectos vinculados todavía no cuenta con medición completa."
+      detail: "Parte de las unidades vinculadas todavía no cuenta con medición completa."
     };
   }
   const progress = Number(item.progress || 0);
@@ -350,7 +350,7 @@ function projectCard(metric) {
     <article class="mandate-project-row">
       <div class="mandate-project-main">
         <div class="mandate-project-title">
-          <span class="mandate-project-code">${escapeHTML(metric.project.codigo || "Proyecto")}</span>
+          <span class="mandate-project-code">${escapeHTML(metric.project.codigo || (metric.project.tipo_unidad === "actividad_general" ? "Actividad general" : "Proyecto"))}</span>
           <strong>${escapeHTML(metric.project.nombre)}</strong>
         </div>
         <small>${escapeHTML(projectLocation(metric))}</small>
@@ -367,7 +367,7 @@ function projectCard(metric) {
         <span class="status-chip ${state.className}">${escapeHTML(state.label)}</span>
       </div>
       <div class="mandate-project-action">
-        <button class="text-button open-linked-project" type="button" data-project-id="${metric.project.id}">Abrir proyecto</button>
+        <button class="text-button open-linked-project" type="button" data-project-id="${metric.project.id}">Abrir unidad</button>
       </div>
     </article>
   `;
@@ -401,14 +401,14 @@ function mandateCard(item, isOpen = false) {
 
       <div class="mandate-tracking-metrics">
         <div>
-          <span>Proyectos relacionados</span>
+          <span>Unidades relacionadas</span>
           <strong>${formatInteger(item.projects.length)}</strong>
           <small>${formatInteger(item.projectsInCalculation.length)} en cálculo activo</small>
         </div>
         <div>
           <span>Consejerías vinculadas</span>
           <strong>${formatInteger(councilNames.length)}</strong>
-          <small>${formatInteger(item.projectCouncilCount)} con Proyectos</small>
+          <small>${formatInteger(item.projectCouncilCount)} con unidades</small>
         </div>
         <div>
           <span>Avance asociado</span>
@@ -438,16 +438,16 @@ function mandateCard(item, isOpen = false) {
 
         <div class="mandate-projects-heading">
           <div>
-            <span>Proyectos vinculados</span>
+            <span>Unidades vinculadas</span>
             <strong>${item.projects.length}</strong>
           </div>
-          <small>El avance del Mandato se presenta como una lectura asociada a estos Proyectos.</small>
+          <small>El avance del Mandato se presenta como una lectura asociada a estas unidades.</small>
         </div>
 
         <div class="mandate-project-list">
           ${item.projects.length
             ? item.projects.map(projectCard).join("")
-            : `<div class="empty-inline">Este Mandato todavía no tiene Proyectos vinculados dentro del ámbito seleccionado.</div>`}
+            : `<div class="empty-inline">Este Mandato todavía no tiene unidades vinculadas dentro del ámbito seleccionado.</div>`}
         </div>
       </section>
     </article>
@@ -474,14 +474,14 @@ function summaryHTML(items) {
         <span>En el ámbito seleccionado</span>
       </article>
       <article class="metric-card">
-        <small>Con Proyectos vinculados</small>
+        <small>Con unidades vinculadas</small>
         <strong>${withProjects.length}</strong>
-        <span>${withoutProjects ? `${withoutProjects} sin Proyecto asociado` : "Todos cuentan con relación operativa"}</span>
+        <span>${withoutProjects ? `${withoutProjects} sin unidad asociada` : "Todos cuentan con relación operativa"}</span>
       </article>
       <article class="metric-card">
         <small>Avance asociado promedio</small>
         <strong>${formatPct(averageProgress)}</strong>
-        <span>Promedio de Mandatos con Proyectos en cálculo</span>
+        <span>Promedio de Mandatos con unidades en cálculo</span>
       </article>
       <article class="metric-card">
         <small>Cobertura promedio</small>
@@ -517,11 +517,11 @@ export async function renderSeguimientoMandatos(container, navigationTarget = nu
       <summary>Cómo interpretar el avance asociado de los Mandatos</summary>
       <div>
         <p>
-          El avance asociado toma como referencia el avance técnico de los Proyectos vinculados a cada Mandato.
+          El avance asociado toma como referencia el avance técnico de las unidades vinculadas a cada Mandato.
           Sirve para orientar el seguimiento del Plan, pero <strong>no representa por sí solo el cumplimiento integral del Mandato</strong>.
         </p>
         <p>
-          Si un Mandato tiene Proyectos en Programas diferentes, cada Proyecto participa de forma equivalente para no mezclar ponderaciones que pertenecen a estructuras distintas.
+          Si un Mandato tiene unidades en Programas diferentes, cada unidad participa de forma equivalente para no mezclar ponderaciones que pertenecen a estructuras distintas.
         </p>
       </div>
     </details>
@@ -543,8 +543,8 @@ export async function renderSeguimientoMandatos(container, navigationTarget = nu
           <select id="mandateTrackingStatus">
             <option value="activos">Activos</option>
             <option value="todos">Todos</option>
-            <option value="con_proyectos">Con Proyectos</option>
-            <option value="sin_proyectos">Sin Proyectos</option>
+            <option value="con_proyectos">Con unidades</option>
+            <option value="sin_proyectos">Sin unidades</option>
             <option value="medicion_parcial">Medición parcial</option>
             <option value="sin_medicion">Sin medición</option>
           </select>

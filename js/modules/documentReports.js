@@ -1,8 +1,8 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
-import { logManualEvent } from "../security.js?v=5.3.1";
-import { openModal, closeModal } from "../components/modal.js?v=5.3.1";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.3.1";
-import { uiIcon } from "../components/uiSystem.js?v=5.3.1";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
+import { logManualEvent } from "../security.js?v=5.4.2";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.2";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.2";
+import { uiIcon } from "../components/uiSystem.js?v=5.4.2";
 
 const LOGO_PATH = "./assets/branding/onic-logo.png";
 
@@ -572,15 +572,68 @@ function scopeBudget(consejerias = []) {
 async function getVigenciaPayload(vigenciaId) {
   const supabase = requireSupabase();
 
-  const { data, error } =
-    await supabase.rpc(
-      "exportar_vigencia_json",
-      {
-        p_vigencia_id: vigenciaId
-      }
-    );
-
+  const { data, error } = await supabase.rpc(
+    "exportar_vigencia_json",
+    { p_vigencia_id: vigenciaId }
+  );
   if (error) throw error;
+
+  // El formato histórico de respaldo no incluye todavía el tipo de unidad.
+  // Se enriquece el modelo del documento con la clasificación vigente sin
+  // alterar el RPC ni la compatibilidad de copias anteriores.
+  try {
+    const { data: vcs, error: vcError } = await supabase
+      .from("vigencia_consejerias").select("id").eq("vigencia_id", vigenciaId);
+    if (vcError) throw vcError;
+    const vcIds = (vcs || []).map((row) => row.id);
+    if (!vcIds.length) return data;
+
+    const { data: lines, error: lineError } = await supabase
+      .from("lineas_accion").select("id,vigencia_consejeria_id,nombre").in("vigencia_consejeria_id", vcIds);
+    if (lineError) throw lineError;
+    const lineIds = (lines || []).map((row) => row.id);
+    if (!lineIds.length) return data;
+
+    const { data: programs, error: programError } = await supabase
+      .from("programas").select("id,linea_accion_id,nombre").in("linea_accion_id", lineIds);
+    if (programError) throw programError;
+    const programIds = (programs || []).map((row) => row.id);
+    if (!programIds.length) return data;
+
+    const { data: units, error: unitError } = await supabase
+      .from("proyectos")
+      .select("id,programa_id,codigo,nombre,tipo_unidad,actividad_principal_id")
+      .in("programa_id", programIds);
+    if (unitError) throw unitError;
+
+    const lineById = new Map((lines || []).map((row) => [row.id, row]));
+    const programById = new Map((programs || []).map((row) => [row.id, row]));
+    const metadata = new Map();
+    (units || []).forEach((unit) => {
+      const program = programById.get(unit.programa_id);
+      const line = program ? lineById.get(program.linea_accion_id) : null;
+      if (!program || !line) return;
+      const key = [normalize(line.nombre), normalize(program.nombre), normalize(unit.codigo || unit.nombre)].join("|");
+      metadata.set(key, unit);
+    });
+
+    arr(data?.consejerias).forEach((council) => {
+      arr(council.lineas).forEach((line) => {
+        arr(line.programas).forEach((program) => {
+          arr(program.proyectos).forEach((project) => {
+            const key = [normalize(line.nombre), normalize(program.nombre), normalize(project.codigo || project.nombre)].join("|");
+            const meta = metadata.get(key);
+            if (!meta) return;
+            project.tipo_unidad = meta.tipo_unidad || "proyecto";
+            project.actividad_principal_id = meta.actividad_principal_id || null;
+          });
+        });
+      });
+    });
+  } catch (metadataError) {
+    console.warn("No fue posible enriquecer los tipos de unidad para el documento.", metadataError);
+  }
+
   return data;
 }
 
@@ -1124,18 +1177,21 @@ function renderActivityFollowupsToBlocks(
 
 function renderActivityToBlocks(
   blocks,
-  activity
+  activity,
+  { direct = false, headingLevel = 4 } = {}
 ) {
   const metric =
     activityMetric(activity);
 
-  pushHeading(
-    blocks,
-    4,
-    activity.codigo
-      ? `${activity.codigo} - ${activity.nombre}`
-      : activity.nombre
-  );
+  if (!direct) {
+    pushHeading(
+      blocks,
+      headingLevel,
+      activity.codigo
+        ? `${activity.codigo} - ${activity.nombre}`
+        : activity.nombre
+    );
+  }
 
   pushTable(
     blocks,
@@ -1173,7 +1229,7 @@ function renderActivityToBlocks(
 
   pushHeading(
     blocks,
-    5,
+    direct ? Math.min(headingLevel + 1, 5) : 5,
     "Indicadores"
   );
 
@@ -1184,7 +1240,7 @@ function renderActivityToBlocks(
 
   pushHeading(
     blocks,
-    5,
+    direct ? Math.min(headingLevel + 1, 5) : 5,
     "Presupuesto"
   );
 
@@ -1195,7 +1251,7 @@ function renderActivityToBlocks(
 
   pushHeading(
     blocks,
-    5,
+    direct ? Math.min(headingLevel + 1, 5) : 5,
     "Evidencias"
   );
 
@@ -1206,7 +1262,7 @@ function renderActivityToBlocks(
 
   pushHeading(
     blocks,
-    5,
+    direct ? Math.min(headingLevel + 1, 5) : 5,
     "Seguimiento narrativo"
   );
 
@@ -1246,6 +1302,10 @@ function renderProjectToBlocks({
     blocks,
     ["Campo", "Información"],
     infoRows([
+      [
+        "Tipo de unidad",
+        project.tipo_unidad === "actividad_general" ? "Actividad general" : "Proyecto"
+      ],
       [
         "Estado",
         statusLabel(project.estado)
@@ -1311,7 +1371,7 @@ function renderProjectToBlocks({
       headingLevel + 1,
       5
     ),
-    "Objetivo del Proyecto"
+    project.tipo_unidad === "actividad_general" ? "Propósito / objetivo" : "Objetivo del Proyecto"
   );
 
   pushParagraph(
@@ -1338,33 +1398,26 @@ function renderProjectToBlocks({
     )
   );
 
-  pushHeading(
-    blocks,
-    Math.min(
-      headingLevel + 1,
-      5
-    ),
-    "Actividades"
-  );
-
-  if (
-    !arr(project.actividades).length
-  ) {
-    pushParagraph(
-      blocks,
-      "El Proyecto no tiene Actividades registradas.",
-      {
-        italic: true
-      }
-    );
+  if (project.tipo_unidad === "actividad_general") {
+    const principal = arr(project.actividades)[0] || null;
+    if (!principal) {
+      pushParagraph(blocks, "La Actividad general todavía no tiene información de seguimiento registrada.", { italic: true });
+    } else {
+      renderActivityToBlocks(blocks, principal, { direct: true, headingLevel });
+    }
   } else {
-    arr(project.actividades)
-      .forEach((activity) => {
-        renderActivityToBlocks(
-          blocks,
-          activity
-        );
+    pushHeading(
+      blocks,
+      Math.min(headingLevel + 1, 5),
+      "Actividades"
+    );
+    if (!arr(project.actividades).length) {
+      pushParagraph(blocks, "El Proyecto no tiene Actividades registradas.", { italic: true });
+    } else {
+      arr(project.actividades).forEach((activity) => {
+        renderActivityToBlocks(blocks, activity);
       });
+    }
   }
 }
 
@@ -1837,7 +1890,7 @@ function renderConsejeriaToBlocks({
         value: counts.programas
       },
       {
-        label: "Proyectos",
+        label: "Proyectos / Actividades",
         value: counts.proyectos
       },
       {
@@ -2036,7 +2089,7 @@ function buildVigenciaDocument(payload) {
         value: counts.programas
       },
       {
-        label: "Proyectos",
+        label: "Proyectos / Actividades",
         value: counts.proyectos
       },
       {
@@ -2162,7 +2215,7 @@ function buildProjectDocument(
 
   if (!found) {
     throw new Error(
-      "No fue posible localizar el Proyecto dentro de la Vigencia."
+      "No fue posible localizar la unidad dentro de la Vigencia."
     );
   }
 
@@ -2242,7 +2295,7 @@ function buildProjectDocument(
   pushHeading(
     blocks,
     1,
-    "Auditoría del Proyecto"
+    project.tipo_unidad === "actividad_general" ? "Auditoría de la Actividad general" : "Auditoría del Proyecto"
   );
 
   renderAuditToBlocks(
@@ -2259,7 +2312,7 @@ function buildProjectDocument(
 
   return {
     title:
-      "Documento integral de Proyecto",
+      project.tipo_unidad === "actividad_general" ? "Documento integral de Actividad general" : "Documento integral de Proyecto",
     subtitle:
       project.codigo
         ? `${project.codigo} - ${project.nombre}`
@@ -2267,7 +2320,7 @@ function buildProjectDocument(
     vigencia,
     blocks,
     filename:
-      `proyecto_${safeFilename(project.codigo || project.nombre)}`
+      `${project.tipo_unidad === "actividad_general" ? "actividad_general" : "proyecto"}_${safeFilename(project.codigo || project.nombre)}`
   };
 }
 
@@ -4171,7 +4224,7 @@ export async function openDocumentReportDialog({
 
       <div class="document-report-summary">
         <div>
-          <span>Proyectos</span>
+          <span>Proyectos / Actividades</span>
           <strong>
             ${counts.proyectos ?? "—"}
           </strong>

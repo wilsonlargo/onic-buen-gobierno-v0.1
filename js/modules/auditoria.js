@@ -1,7 +1,7 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
-import { openModal, closeModal } from "../components/modal.js?v=5.3.1";
-import { updateWithVersion } from "../security.js?v=5.3.1";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.3.1";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.2";
+import { updateWithVersion } from "../security.js?v=5.4.2";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.2";
 
 let currentContext = null;
 let initialized = false;

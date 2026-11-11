@@ -1,8 +1,8 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
-import { updateWithVersion } from "../security.js?v=5.3.1";
-import { openModal, closeModal } from "../components/modal.js?v=5.3.1";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.3.1";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.3.1";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
+import { updateWithVersion } from "../security.js?v=5.4.2";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.2";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.2";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.2";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -185,12 +185,12 @@ async function getProgramCounts(lineaIds = []) {
 
   const { data, error } = await supabase
     .from("programas")
-    .select("id,linea_accion_id")
+    .select("id,linea_accion_id,estado")
     .in("linea_accion_id", lineaIds);
 
   if (error) throw error;
 
-  (data || []).forEach((programa) => {
+  (data || []).filter((programa) => programa.estado !== "archivado").forEach((programa) => {
     counts.set(
       programa.linea_accion_id,
       (counts.get(programa.linea_accion_id) || 0) + 1
@@ -421,7 +421,7 @@ async function openDeleteLineaDialog({ record, onChanged }) {
 
         <p class="muted">
           Puedes marcarla como <strong>Inactiva</strong> o <strong>Archivada</strong>.
-          Sus Programas permanecerán intactos.
+          Sus Programas permanecerán intactos. Si la archivas, dejará de contarse como Línea vigente y quedará disponible únicamente como histórico.
         </p>
 
         <p id="protectedLineaMessage" class="form-message"></p>
@@ -1325,7 +1325,9 @@ export async function renderLineas(container, navigationTarget = null) {
 
     lineas = await getLineas(vc.id);
 
-    count.textContent = String(lineas.length);
+    const currentLineas = lineas.filter((linea) => linea.estado !== "archivada");
+    const archivedLineas = lineas.filter((linea) => linea.estado === "archivada");
+    count.textContent = String(currentLineas.length);
     updateActions();
 
     const vigencia = currentVigencia();
@@ -1388,14 +1390,16 @@ export async function renderLineas(container, navigationTarget = null) {
         </div>
       </div>
 
+      ${archivedLineas.length ? `<div class="historical-summary"><strong>${archivedLineas.length} ${archivedLineas.length === 1 ? "Línea archivada" : "Líneas archivadas"}</strong><span>Se conservan como histórico y no se incluyen en el total vigente ni en la ponderación.</span></div>` : ""}
+
       <div class="lineas-grid">
-        ${lineas.map((linea) => {
+        ${[...currentLineas, ...archivedLineas].map((linea) => {
           const weight = Number(weights.get(linea.id) || 0);
           const programas = Number(programCounts.get(linea.id) || 0);
           const isActive = linea.estado === "activa";
 
           return `
-            <article id="audit-linea-${linea.id}" class="linea-card ${!isActive ? "is-inactive" : ""}">
+            <article id="audit-linea-${linea.id}" class="linea-card ${!isActive ? "is-inactive" : ""} ${linea.estado === "archivada" ? "historical-record" : ""}">
               <div class="linea-card-header">
                 <div>
                   <p class="eyebrow">
@@ -1471,8 +1475,8 @@ export async function renderLineas(container, navigationTarget = null) {
                   class="icon-btn danger delete-linea"
                   type="button"
                   data-id="${linea.id}"
-                  title="Eliminar Línea de Acción"
-                  aria-label="Eliminar ${escapeHTML(linea.nombre)}"
+                  title="Eliminar o archivar Línea de Acción"
+                  aria-label="Eliminar o archivar ${escapeHTML(linea.nombre)}"
                 >
                   ${trashIcon()}
                 </button>

@@ -1,10 +1,10 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
-import { updateWithVersion, logManualEvent } from "../security.js?v=5.3.1";
-import { openModal, closeModal } from "../components/modal.js?v=5.3.1";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.3.1";
-import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.3.1";
-import { renderProjectPlanner, plannerColorOptions, exportProjectPlanner } from "./projectPlanner.js?v=5.3.1";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.3.1";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
+import { updateWithVersion, logManualEvent } from "../security.js?v=5.4.2";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.2";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.2";
+import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.2";
+import { renderProjectPlanner, plannerColorOptions, exportProjectPlanner } from "./projectPlanner.js?v=5.4.2";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.2";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -57,6 +57,19 @@ function todayISO() {
   const now = new Date();
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 10);
+}
+
+function isGeneralActivityUnit(project) {
+  return project?.tipo_unidad === "actividad_general";
+}
+
+function unitLabel(project) {
+  return isGeneralActivityUnit(project) ? "Actividad general" : "Proyecto";
+}
+
+function projectStateToActivityState(estado) {
+  const map = { borrador: "borrador", formulacion: "programada", activo: "en_ejecucion", suspendido: "suspendida", cerrado: "completada" };
+  return map[estado] || "borrador";
 }
 
 function projectStatusChip(estado) {
@@ -158,6 +171,19 @@ function calculateBudgetMetrics(items = []) {
   const executed = active.reduce((sum, item) => sum + Number(item.ejecutado || 0), 0);
   const execution = programmed > 0 ? Math.min(100, Math.max(0, (executed / programmed) * 100)) : null;
   return { programmed, executed, execution };
+}
+
+function activityHasBudgetAccess(project, activity, budgetItems = []) {
+  if (budgetItems.length > 0) return true;
+  if (isGeneralActivityUnit(project)) return Boolean(project?.tiene_financiacion);
+  return Boolean(activity?.tiene_financiacion);
+}
+
+function normalizeActivityTab(tab, project, activity, budgetItems = []) {
+  const aliases = { indicadores: "avance", seguimiento: "avance" };
+  const normalized = aliases[tab] || tab || "general";
+  if (normalized === "presupuesto" && !activityHasBudgetAccess(project, activity, budgetItems)) return "general";
+  return ["general", "avance", "evidencias", "presupuesto"].includes(normalized) ? normalized : "general";
 }
 
 function calculateProjectMetrics(activities, indicators, budgetItems) {
@@ -410,6 +436,7 @@ function openActivityForm({ projectId, record = null, onSaved }) {
             ${option("completada", "Completada", record?.estado === "completada")}
             ${option("cancelada", "Cancelada", record?.estado === "cancelada")}
           </select></div>
+          <div class="form-field"><label class="checkbox-inline"><input name="tiene_financiacion" type="checkbox" ${record?.tiene_financiacion ? "checked" : ""}><span>Tiene financiación / maneja presupuesto</span></label><small class="field-help">Actívalo solo cuando esta Actividad requiera control presupuestal.</small></div>
           <div class="form-field"><label>Color en Planeador</label><select name="planeador_color">
             ${plannerColorOptions().map((item) => option(item.value, item.label, (record?.planeador_color || "") === item.value)).join("")}
           </select><small class="field-help">El color es una ayuda visual y no modifica el avance ni el estado.</small></div>
@@ -433,6 +460,7 @@ function openActivityForm({ projectId, record = null, onSaved }) {
       fecha_inicio: data.get("fecha_inicio") || null,
       fecha_fin: data.get("fecha_fin") || null,
       estado: data.get("estado"),
+      tiene_financiacion: data.get("tiene_financiacion") === "on",
       planeador_color: data.get("planeador_color") || null,
       orden: Number(data.get("orden") || 0)
     };
@@ -710,6 +738,32 @@ function openActivityFollowup({ activityId, onSaved }) {
   });
 }
 
+function openActivityAdvanceChooser({ indicators = [], onSaved }) {
+  const active = indicators.filter((indicator) => indicator.estado === "activo");
+  if (!active.length) {
+    openModal({
+      title: "Registrar avance",
+      content: `<div class="info-callout"><strong>Primero crea un indicador.</strong><p>El avance técnico de una Actividad se calcula a partir de sus indicadores activos.</p></div><div class="form-actions"><button id="closeAdvanceChooser" class="btn btn-primary" type="button">Entendido</button></div>`
+    });
+    document.querySelector("#closeAdvanceChooser").addEventListener("click", closeModal);
+    return;
+  }
+  if (active.length === 1) {
+    openIndicatorFollowup({ indicator: active[0], onSaved });
+    return;
+  }
+  openModal({
+    title: "Registrar avance",
+    content: `<p class="muted">Selecciona el indicador que deseas actualizar.</p><div class="advance-indicator-picker">${active.map((indicator) => `<button class="advance-indicator-choice" type="button" data-id="${indicator.id}"><span>${escapeHTML(indicator.codigo || "Indicador")}</span><strong>${escapeHTML(indicator.nombre)}</strong><small>Actual: ${formatNumber(indicator.valor_actual, 4)}${indicator.unidad_medida ? ` ${escapeHTML(indicator.unidad_medida)}` : ""}</small></button>`).join("")}</div><div class="form-actions"><button id="cancelAdvanceChooser" class="btn btn-secondary" type="button">Cancelar</button></div>`
+  });
+  document.querySelector("#cancelAdvanceChooser").addEventListener("click", closeModal);
+  document.querySelectorAll(".advance-indicator-choice").forEach((button) => button.addEventListener("click", () => {
+    const indicator = active.find((item) => item.id === button.dataset.id);
+    closeModal();
+    if (indicator) openIndicatorFollowup({ indicator, onSaved });
+  }));
+}
+
 export async function renderProyectoWorkspace(container, options) {
   const { projectId, vigencia, vigenciaConsejeria, linea, programa, onBack, onProjectChanged } = options;
 
@@ -797,7 +851,7 @@ export async function renderProyectoWorkspace(container, options) {
       <nav class="project-workspace-tabs" aria-label="Secciones del Proyecto">
         <button class="${projectTab === "perfil" ? "active" : ""}" data-project-tab="perfil" type="button">Perfil</button>
         <button class="${projectTab === "planeador" ? "active" : ""}" data-project-tab="planeador" type="button">Planeador</button>
-        <button class="${projectTab === "actividades" ? "active" : ""}" data-project-tab="actividades" type="button">Actividades <span>${activities.length}</span></button>
+        <button class="${projectTab === "actividades" ? "active" : ""}" data-project-tab="actividades" type="button">Actividades <span>${activities.filter((activity) => activity.estado !== "cancelada").length}</span></button>
         <button class="${projectTab === "seguimiento" ? "active" : ""}" data-project-tab="seguimiento" type="button">Seguimiento</button>
       </nav>`;
   }
@@ -815,7 +869,7 @@ export async function renderProyectoWorkspace(container, options) {
   function renderShell() {
     container.innerHTML = `
       <section class="project-workspace">
-        <button id="backToProjects" class="workspace-back-button" type="button">${arrowIcon()} Volver a proyectos</button>
+        <button id="backToProjects" class="workspace-back-button" type="button">${arrowIcon()} Volver a Proyectos / Actividades</button>
         <header class="project-workspace-header">${headerHTML()}</header>
         ${projectNavigationHTML()}
         <div id="projectWorkspaceBody"></div>
@@ -969,9 +1023,9 @@ export async function renderProyectoWorkspace(container, options) {
         title: "La actividad tiene información asociada",
         content: `
           <div class="danger-callout"><strong>${escapeHTML(activity.codigo || activity.nombre)}</strong><p>Esta actividad ya tiene indicadores, presupuesto, evidencias o seguimientos. No puede eliminarse físicamente porque se perdería la trazabilidad.</p></div>
-          <p class="muted">Puedes marcarla como <strong>Cancelada</strong>. Toda su información permanecerá disponible.</p>
+          <p class="muted">Puedes <strong>cancelarla</strong>. No se eliminará: quedará disponible como histórico, pero dejará de contar como Actividad vigente, no participará en el avance actual y no bloqueará la conversión del Proyecto.</p>
           <p id="activityProtectionMessage" class="form-message"></p>
-          <div class="form-actions"><button id="cancelProtectedActivity" class="btn btn-secondary" type="button">Cerrar</button>${activity.estado !== "cancelada" ? `<button id="cancelActivityRecord" class="btn btn-danger" type="button">Marcar como cancelada</button>` : ""}</div>`
+          <div class="form-actions"><button id="cancelProtectedActivity" class="btn btn-secondary" type="button">Cerrar</button>${activity.estado !== "cancelada" ? `<button id="cancelActivityRecord" class="btn btn-danger" type="button">Cancelar actividad</button>` : ""}</div>`
       });
       document.querySelector("#cancelProtectedActivity").addEventListener("click", closeModal);
       const cancelButton = document.querySelector("#cancelActivityRecord");
@@ -984,12 +1038,12 @@ export async function renderProyectoWorkspace(container, options) {
             closeModal();
             await reloadOperationalData();
             renderActivities();
-            showToast("Actividad marcada como cancelada.");
+            showToast("Actividad cancelada. Ya no se cuenta como vigente ni bloquea la conversión del Proyecto.");
           } catch (error) {
             console.error(error);
             document.querySelector("#activityProtectionMessage").textContent = friendlyErrorMessage(error, "No fue posible actualizar la actividad.");
             cancelButton.disabled = false;
-            cancelButton.textContent = "Marcar como cancelada";
+            cancelButton.textContent = "Cancelar actividad";
           }
         });
       }
@@ -1051,10 +1105,9 @@ export async function renderProyectoWorkspace(container, options) {
         },
         sectionOptions: [
           { value: "general", label: "General", navigation: { activity_tab: "general" } },
-          { value: "indicadores", label: "Indicadores", navigation: { activity_tab: "indicadores" } },
-          { value: "presupuesto", label: "Presupuesto", navigation: { activity_tab: "presupuesto" } },
+          { value: "avance", label: "Avance", navigation: { activity_tab: "avance" } },
           { value: "evidencias", label: "Evidencias", navigation: { activity_tab: "evidencias" } },
-          { value: "seguimiento", label: "Seguimiento", navigation: { activity_tab: "seguimiento" } }
+          ...(activityHasBudgetAccess(project, activity, budgetForActivity(activity.id)) ? [{ value: "presupuesto", label: "Presupuesto", navigation: { activity_tab: "presupuesto" } }] : [])
         ]
       }
     });
@@ -1101,7 +1154,7 @@ export async function renderProyectoWorkspace(container, options) {
     renderProjectPlanner({
       container: body,
       project,
-      activities,
+      activities: activities.filter((activity) => activity.estado !== "cancelada"),
       indicators,
       budgetItems,
       evidence,
@@ -1146,7 +1199,7 @@ export async function renderProyectoWorkspace(container, options) {
             view,
             scale,
             project,
-            activities,
+            activities: activities.filter((activity) => activity.estado !== "cancelada"),
             indicators,
             budgetItems,
             evidence,
@@ -1194,37 +1247,46 @@ export async function renderProyectoWorkspace(container, options) {
       budgetByActivity.get(item.actividad_id).push(item);
     });
 
+    const currentActivities = activities.filter((activity) => activity.estado !== "cancelada");
+    const historicalActivities = activities.filter((activity) => activity.estado === "cancelada");
+
+    const activityCard = (activity, historical = false) => {
+      const activityIndicators = indicatorsByActivity.get(activity.id) || [];
+      const activityBudgetItems = budgetByActivity.get(activity.id) || [];
+      const budgetMetric = calculateBudgetMetrics(activityBudgetItems);
+      const showBudget = activityHasBudgetAccess(project, activity, activityBudgetItems);
+      const progress = historical ? null : metrics.progressByActivity.get(activity.id);
+      const weight = historical ? 0 : Number(metrics.weights.get(activity.id) || 0);
+      const evidenceCount = evidenceForActivity(activity.id).filter((item) => item.estado === "activa").length;
+      return `
+        <article class="activity-work-card ${historical ? "is-cancelled historical-record" : ""}">
+          <div class="activity-work-card-header"><div><p class="eyebrow">${escapeHTML(activity.codigo || `Actividad ${Number(activity.orden || 0) + 1}`)}</p><h4>${escapeHTML(activity.nombre)}</h4></div>${activityStatusChip(activity.estado)}</div>
+          <p class="muted activity-work-description">${escapeHTML(activity.descripcion || "Sin descripción registrada.")}</p>
+          <div class="activity-work-metrics">
+            <div><span>Peso técnico</span><strong>${historical ? "—" : formatPercent(weight)}</strong><small>${historical ? "Fuera del cálculo" : "Automático"}</small></div>
+            <div><span>Avance técnico</span><strong>${historical ? "—" : formatPercent(progress)}</strong><small>${historical ? "Histórico" : `${activityIndicators.filter((i) => i.estado === "activo").length} indicadores`}</small></div>
+            <div><span>Evidencias</span><strong>${evidenceCount}</strong><small>Activas</small></div>
+            ${showBudget ? `<div><span>Presupuesto</span><strong>${formatMoney(budgetMetric.programmed)}</strong><small>${formatPercent(budgetMetric.execution)} ejecutado</small></div>` : ""}
+          </div>
+          <div class="activity-work-detail"><span>Responsable<strong>${escapeHTML(activity.responsable || "Sin registrar")}</strong></span><span>Periodo<strong>${formatDate(activity.fecha_inicio)} – ${formatDate(activity.fecha_fin)}</strong></span></div>
+          <div class="entity-actions">
+            <button class="btn btn-primary open-activity" type="button" data-id="${activity.id}">Abrir actividad ${openIcon()}</button>
+            <button class="btn btn-secondary audit-activity-note" type="button" data-id="${activity.id}">Nota</button>
+            <button class="btn btn-secondary edit-activity" type="button" data-id="${activity.id}">Editar</button>
+            ${historical ? "" : `<button class="icon-btn danger delete-activity" type="button" data-id="${activity.id}" title="Eliminar o cancelar actividad" aria-label="Eliminar o cancelar ${escapeHTML(activity.nombre)}">${trashIcon()}</button>`}
+          </div>
+        </article>`;
+    };
+
     body.innerHTML = `
       <section class="workspace-section workspace-section-flush">
         <div class="workspace-section-heading">
-          <div><p class="eyebrow">Ejecución</p><h3>Actividades del Proyecto</h3><p class="muted">El objetivo del Proyecto se cumple mediante estas actividades. Indicadores, presupuesto, evidencias y seguimiento pertenecen a cada actividad.</p></div>
+          <div><p class="eyebrow">Ejecución</p><h3>Actividades del Proyecto</h3><p class="muted">El objetivo del Proyecto se cumple mediante estas Actividades. En cada una encontrarás General, Avance y Evidencias; Presupuesto aparece solo cuando corresponde.</p></div>
           <button id="newActivityButton" class="btn btn-primary" type="button">+ Nueva actividad</button>
         </div>
-        ${activities.length ? `<div class="activity-work-grid">${activities.map((activity) => {
-          const activityIndicators = indicatorsByActivity.get(activity.id) || [];
-          const budgetMetric = calculateBudgetMetrics(budgetByActivity.get(activity.id) || []);
-          const progress = metrics.progressByActivity.get(activity.id);
-          const weight = Number(metrics.weights.get(activity.id) || 0);
-          const evidenceCount = evidenceForActivity(activity.id).filter((item) => item.estado === "activa").length;
-          return `
-            <article class="activity-work-card ${activity.estado === "cancelada" ? "is-cancelled" : ""}">
-              <div class="activity-work-card-header"><div><p class="eyebrow">${escapeHTML(activity.codigo || `Actividad ${Number(activity.orden || 0) + 1}`)}</p><h4>${escapeHTML(activity.nombre)}</h4></div>${activityStatusChip(activity.estado)}</div>
-              <p class="muted activity-work-description">${escapeHTML(activity.descripcion || "Sin descripción registrada.")}</p>
-              <div class="activity-work-metrics">
-                <div><span>Peso técnico</span><strong>${formatPercent(weight)}</strong><small>Automático</small></div>
-                <div><span>Avance técnico</span><strong>${formatPercent(progress)}</strong><small>${activityIndicators.filter((i) => i.estado === "activo").length} indicadores</small></div>
-                <div><span>Presupuesto</span><strong>${formatMoney(budgetMetric.programmed)}</strong><small>${formatPercent(budgetMetric.execution)} ejecutado</small></div>
-                <div><span>Evidencias</span><strong>${evidenceCount}</strong><small>Activas</small></div>
-              </div>
-              <div class="activity-work-detail"><span>Responsable<strong>${escapeHTML(activity.responsable || "Sin registrar")}</strong></span><span>Periodo<strong>${formatDate(activity.fecha_inicio)} – ${formatDate(activity.fecha_fin)}</strong></span></div>
-              <div class="entity-actions">
-                <button class="btn btn-primary open-activity" type="button" data-id="${activity.id}">Abrir actividad ${openIcon()}</button>
-                <button class="btn btn-secondary audit-activity-note" type="button" data-id="${activity.id}">Nota</button>
-                <button class="btn btn-secondary edit-activity" type="button" data-id="${activity.id}">Editar</button>
-                <button class="icon-btn danger delete-activity" type="button" data-id="${activity.id}" title="Eliminar actividad">${trashIcon()}</button>
-              </div>
-            </article>`;
-        }).join("")}</div>` : `<div class="empty-state workspace-empty"><strong>El Proyecto todavía no tiene actividades.</strong><p>Crea la primera actividad para comenzar la formulación operativa.</p></div>`}
+        <div class="record-count-summary"><strong>${currentActivities.length} ${currentActivities.length === 1 ? "Actividad vigente" : "Actividades vigentes"}</strong>${historicalActivities.length ? `<span>${historicalActivities.length} cancelada${historicalActivities.length === 1 ? "" : "s"} en histórico</span>` : ""}</div>
+        ${currentActivities.length ? `<div class="activity-work-grid">${currentActivities.map((activity) => activityCard(activity)).join("")}</div>` : `<div class="empty-state workspace-empty"><strong>El Proyecto no tiene actividades vigentes.</strong><p>Crea una nueva actividad o, si corresponde, convierte el Proyecto en Actividad general. Las Actividades canceladas no bloquean esa conversión.</p></div>`}
+        ${historicalActivities.length ? `<details class="historical-records"><summary>Ver Actividades canceladas (${historicalActivities.length})</summary><p class="muted">Se conservan para trazabilidad, pero no cuentan como vigentes ni participan en el cálculo actual.</p><div class="activity-work-grid">${historicalActivities.map((activity) => activityCard(activity, true)).join("")}</div></details>` : ""}
       </section>`;
 
     body.querySelector("#newActivityButton").addEventListener("click", () => {
@@ -1234,7 +1296,6 @@ export async function renderProyectoWorkspace(container, options) {
     body.querySelectorAll(".audit-activity-note").forEach((button) => button.addEventListener("click", () => {
       const activity = activities.find((item) => item.id === button.dataset.id);
       if (!activity) return;
-
       openAuditPanel({
         newNote: true,
         contextOverride: {
@@ -1255,15 +1316,13 @@ export async function renderProyectoWorkspace(container, options) {
           },
           sectionOptions: [
             { value: "general", label: "General", navigation: { activity_tab: "general" } },
-            { value: "indicadores", label: "Indicadores", navigation: { activity_tab: "indicadores" } },
-            { value: "presupuesto", label: "Presupuesto", navigation: { activity_tab: "presupuesto" } },
+            { value: "avance", label: "Avance", navigation: { activity_tab: "avance" } },
             { value: "evidencias", label: "Evidencias", navigation: { activity_tab: "evidencias" } },
-            { value: "seguimiento", label: "Seguimiento", navigation: { activity_tab: "seguimiento" } }
+            ...(activityHasBudgetAccess(project, activity, budgetForActivity(activity.id)) ? [{ value: "presupuesto", label: "Presupuesto", navigation: { activity_tab: "presupuesto" } }] : [])
           ]
         }
       });
     }));
-
     body.querySelectorAll(".edit-activity").forEach((button) => button.addEventListener("click", () => {
       const activity = activities.find((item) => item.id === button.dataset.id);
       openActivityForm({ projectId: project.id, record: activity, onSaved: async () => { await reloadOperationalData(); renderActivities(); showToast("Actividad actualizada."); } });
@@ -1382,10 +1441,33 @@ export async function renderProyectoWorkspace(container, options) {
     if (currentActivityId && !activities.some((item) => item.id === currentActivityId)) currentActivityId = null;
   }
 
+  function generalActivityHeaderHTML(activity) {
+    const activityIndicators = indicatorsForActivity(activity.id);
+    const progress = calculateActivityProgress(activityIndicators);
+    const budgetItems = budgetForActivity(activity.id);
+    const budget = calculateBudgetMetrics(budgetItems);
+    const showBudget = activityHasBudgetAccess(project, activity, budgetItems);
+    const contribution = progress === null ? null : progress * Number(project.ponderacion || 0) / 100;
+    return `
+      <div class="project-workspace-breadcrumbs"><span>${escapeHTML(vigencia.nombre)}</span><span>›</span><span>${escapeHTML(vigenciaConsejeria.consejerias.nombre_corto)}</span><span>›</span><span>${escapeHTML(linea.nombre)}</span><span>›</span><span>${escapeHTML(programa.nombre)}</span></div>
+      <div class="project-workspace-title-row">
+        <div><p class="eyebrow">Actividad general · ${escapeHTML(project.codigo || project.nombre_corto || "Sin código")}</p><h2>${escapeHTML(project.nombre)}</h2></div>
+        <div class="project-workspace-header-actions"><span class="unit-type-chip activity">Actividad general</span>${projectStatusChip(project.estado)}<button id="generalActivityDocumentReportButton" class="btn btn-secondary" type="button">${documentReportIcon()} Documento</button></div>
+      </div>
+      <div class="workspace-metrics">
+        <div class="workspace-metric"><span>Ponderación</span><strong>${formatPercent(project.ponderacion)}</strong><small>Dentro del Programa</small></div>
+        <div class="workspace-metric"><span>Avance técnico</span><strong>${formatPercent(progress)}</strong><small>${activityIndicators.filter((i) => i.estado === "activo").length} indicadores activos</small></div>
+        <div class="workspace-metric"><span>Contribución</span><strong>${formatPercent(contribution)}</strong><small>Al Programa</small></div>
+        ${showBudget ? `<div class="workspace-metric"><span>Presupuesto</span><strong>${formatMoney(budget.programmed || project.valor_estimado)}</strong><small>${budget.programmed > 0 ? "Detalle registrado" : "Estimación del perfil"}</small></div><div class="workspace-metric"><span>Ejecución</span><strong>${formatPercent(budget.execution)}</strong><small>${formatMoney(budget.executed)} ejecutado</small></div>` : ""}
+      </div>`;
+  }
+
   function activityHeaderHTML(activity) {
     const activityIndicators = indicatorsForActivity(activity.id);
     const progress = calculateActivityProgress(activityIndicators);
-    const budget = calculateBudgetMetrics(budgetForActivity(activity.id));
+    const budgetItems = budgetForActivity(activity.id);
+    const budget = calculateBudgetMetrics(budgetItems);
+    const showBudget = activityHasBudgetAccess(project, activity, budgetItems);
     const metrics = projectMetrics();
     const weight = Number(metrics.weights.get(activity.id) || 0);
     return `
@@ -1394,36 +1476,135 @@ export async function renderProyectoWorkspace(container, options) {
       <div class="workspace-metrics">
         <div class="workspace-metric"><span>Peso técnico</span><strong>${formatPercent(weight)}</strong><small>Automático dentro del Proyecto</small></div>
         <div class="workspace-metric"><span>Avance técnico</span><strong>${formatPercent(progress)}</strong><small>${activityIndicators.filter((i) => i.estado === "activo").length} indicadores activos</small></div>
-        <div class="workspace-metric"><span>Presupuesto</span><strong>${formatMoney(budget.programmed)}</strong><small>Programado</small></div>
-        <div class="workspace-metric"><span>Ejecución</span><strong>${formatPercent(budget.execution)}</strong><small>${formatMoney(budget.executed)} ejecutado</small></div>
         <div class="workspace-metric"><span>Evidencias</span><strong>${evidenceForActivity(activity.id).filter((e) => e.estado === "activa").length}</strong><small>Activas</small></div>
+        ${showBudget ? `<div class="workspace-metric"><span>Presupuesto</span><strong>${formatMoney(budget.programmed)}</strong><small>Programado</small></div><div class="workspace-metric"><span>Ejecución</span><strong>${formatPercent(budget.execution)}</strong><small>${formatMoney(budget.executed)} ejecutado</small></div>` : ""}
       </div>`;
   }
 
-  function activityNavHTML() {
-    const tabs = [["general","General"],["indicadores","Indicadores"],["presupuesto","Presupuesto"],["evidencias","Evidencias"],["seguimiento","Seguimiento"]];
-    return `<nav class="project-workspace-tabs activity-tabs" aria-label="Secciones de la Actividad">${tabs.map(([id,label]) => `<button class="${activityTab === id ? "active" : ""}" data-activity-tab="${id}" type="button">${label}</button>`).join("")}</nav>`;
+  function activityNavHTML(activity) {
+    const budgetItems = budgetForActivity(activity.id);
+    const tabs = [["general","General"],["avance","Avance"],["evidencias","Evidencias"]];
+    if (activityHasBudgetAccess(project, activity, budgetItems)) tabs.push(["presupuesto","Presupuesto"]);
+    activityTab = normalizeActivityTab(activityTab, project, activity, budgetItems);
+    return `<nav class="project-workspace-tabs activity-tabs" aria-label="Secciones de ${isGeneralActivityUnit(project) ? "la Actividad general" : "la Actividad"}">${tabs.map(([id,label]) => `<button class="${activityTab === id ? "active" : ""}" data-activity-tab="${id}" type="button">${label}</button>`).join("")}</nav>`;
   }
 
   function renderActivityWorkspace() {
     const activity = currentActivity();
-    if (!activity) { currentActivityId = null; projectTab = activityReturnTab; renderShell(); return; }
+    const direct = isGeneralActivityUnit(project);
+    if (!activity) {
+      if (direct) { showToast("La Actividad general no tiene soporte operativo disponible."); return; }
+      currentActivityId = null; projectTab = activityReturnTab; renderShell(); return;
+    }
     container.innerHTML = `
-      <section class="project-workspace activity-workspace">
-        <button id="backToProjectActivities" class="workspace-back-button" type="button">${arrowIcon()} Volver al proyecto</button>
-        <header class="project-workspace-header">${activityHeaderHTML(activity)}</header>
-        ${activityNavHTML()}
+      <section class="project-workspace activity-workspace ${direct ? "general-activity-workspace" : ""}">
+        <button id="backToProjectActivities" class="workspace-back-button" type="button">${arrowIcon()} ${direct ? "Volver a Proyectos / Actividades" : "Volver al proyecto"}</button>
+        <header class="project-workspace-header">${direct ? generalActivityHeaderHTML(activity) : activityHeaderHTML(activity)}</header>
+        ${activityNavHTML(activity)}
         <div id="activityWorkspaceBody"></div>
       </section>
       <div id="projectWorkspaceToast" class="app-toast hidden" role="status"></div>`;
     bindToast();
-    container.querySelector("#backToProjectActivities").addEventListener("click", () => { currentActivityId = null; projectTab = activityReturnTab; renderShell(); });
-    container.querySelectorAll("[data-activity-tab]").forEach((button) => button.addEventListener("click", () => { activityTab = button.dataset.activityTab; renderActivityTab(); }));
-    renderActivityTab();
+    container.querySelector("#backToProjectActivities").addEventListener("click", async () => {
+      if (direct) {
+        if (typeof onProjectChanged === "function") await onProjectChanged();
+        await onBack();
+        return;
+      }
+      currentActivityId = null; projectTab = activityReturnTab; renderShell();
+    });
+    container.querySelector("#generalActivityDocumentReportButton")?.addEventListener("click", () => {
+      openDocumentReportDialog({
+        scope: "proyecto",
+        vigenciaId: vigencia.id,
+        context: {
+          projectId: project.id, projectCode: project.codigo || "", projectName: project.nombre,
+          consejeriaRef: vigenciaConsejeria.id, consejeriaName: vigenciaConsejeria.consejerias.nombre_corto,
+          lineName: linea.nombre, programName: programa.nombre
+        }
+      });
+    });
+    container.querySelectorAll("[data-activity-tab]").forEach((button) => button.addEventListener("click", () => { activityTab = button.dataset.activityTab; renderActivityTab().catch((error) => { console.error(error); showToast(friendlyErrorMessage(error, "No fue posible cargar esta sección.")); }); }));
+    renderActivityTab().catch((error) => { console.error(error); showToast(friendlyErrorMessage(error, "No fue posible cargar esta sección.")); });
+  }
+
+  function renderGeneralUnitProfile(activity) {
+    const body = container.querySelector("#activityWorkspaceBody");
+    body.innerHTML = `
+      <form id="generalUnitProfileForm" class="workspace-form-page">
+        <section class="workspace-section">
+          <div class="workspace-section-heading"><div><p class="eyebrow">Actividad general</p><h3>Información general</h3><p class="muted">Esta unidad se mide directamente; no necesita crear Actividades adicionales.</p></div></div>
+          <div class="workspace-form-grid">
+            <div class="form-field"><label>Código</label><input name="codigo" value="${escapeHTML(project.codigo || "")}"></div>
+            <div class="form-field"><label>Nombre corto</label><input name="nombre_corto" value="${escapeHTML(project.nombre_corto || "")}"></div>
+            <div class="form-field full"><label>Nombre</label><input name="nombre" required value="${escapeHTML(project.nombre || "")}"></div>
+            <div class="form-field full"><label>Descripción</label><textarea name="descripcion" rows="5">${escapeHTML(project.descripcion || "")}</textarea></div>
+            <div class="form-field full"><label>Propósito / objetivo</label><textarea name="objetivo_general" rows="5">${escapeHTML(project.objetivo_general || "")}</textarea></div>
+            <div class="form-field full"><label>Responsable</label><input name="responsable" value="${escapeHTML(project.responsable || "")}"></div>
+            <div class="form-field"><label>Fecha de inicio</label><input name="fecha_inicio" type="date" value="${escapeHTML(project.fecha_inicio || "")}"></div>
+            <div class="form-field"><label>Fecha de cierre</label><input name="fecha_fin" type="date" value="${escapeHTML(project.fecha_fin || "")}"></div>
+            <div class="form-field"><label>Estado</label><select name="estado">${option("borrador", "Borrador", project.estado === "borrador")}${option("formulacion", "Formulación", project.estado === "formulacion")}${option("activo", "Activo", project.estado === "activo")}${option("suspendido", "Suspendido", project.estado === "suspendido")}${option("cerrado", "Cerrado", project.estado === "cerrado")}</select></div>
+            <div class="form-field"><label>Ponderación dentro del Programa</label><div class="percent-input"><input type="number" value="${Number(project.ponderacion || 0).toFixed(2)}" readonly><span>%</span></div><small class="field-help">Se administra desde Ponderaciones.</small></div>
+            <div class="form-field"><label>Orden</label><input name="orden" type="number" min="0" step="1" value="${Number(project.orden || 0)}"></div>
+            <div class="form-field"><label class="checkbox-inline"><input id="generalUnitFinanced" name="tiene_financiacion" type="checkbox" ${project.tiene_financiacion ? "checked" : ""}><span>Tiene financiación / maneja presupuesto</span></label><small class="field-help">La pestaña Presupuesto solo aparece cuando esta opción está activa o ya existen rubros registrados.</small></div>
+            <div class="form-field"><label>Valor estimado (COP)</label><input id="generalUnitValue" name="valor_estimado" type="number" min="0" step="0.01" value="${project.valor_estimado ?? ""}"></div>
+          </div>
+        </section>
+        <section class="workspace-section"><div class="workspace-section-heading"><div><p class="eyebrow">Articulación</p><h3>Mandatos relacionados</h3></div></div>
+          <div class="project-mandates-grid workspace-mandates-grid">${availableMandates.length ? availableMandates.map((mandato) => `<label class="project-mandate-check ${mandato.estado === "archivado" ? "is-archived" : ""}"><input type="checkbox" name="mandatos" value="${mandato.id}" ${mandateIds.includes(mandato.id) ? "checked" : ""}><span><strong>${escapeHTML(mandato.codigo || mandato.titulo || "Mandato")}</strong><small>${escapeHTML(mandato.titulo || mandato.texto)}</small></span></label>`).join("") : `<div class="empty-inline">Esta Consejería no tiene Mandatos disponibles en la Vigencia.</div>`}</div>
+        </section>
+        <div class="workspace-form-footer"><p id="generalUnitProfileMessage" class="form-message"></p><button class="btn btn-primary" type="submit">Guardar cambios</button></div>
+      </form>`;
+
+    const form = body.querySelector("#generalUnitProfileForm");
+    const message = body.querySelector("#generalUnitProfileMessage");
+    const financed = body.querySelector("#generalUnitFinanced");
+    const value = body.querySelector("#generalUnitValue");
+    const syncFinance = () => { value.disabled = !financed.checked; if (!financed.checked) value.value = ""; };
+    financed.addEventListener("change", syncFinance); syncFinance();
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const data = new FormData(form);
+      const start = data.get("fecha_inicio") || null;
+      const end = data.get("fecha_fin") || null;
+      if (start && end && end < start) { message.textContent = "La fecha final no puede ser anterior a la fecha inicial."; return; }
+      const selectedMandates = [...form.querySelectorAll('input[name="mandatos"]:checked')].map((input) => input.value);
+      const submit = form.querySelector('button[type="submit"]'); submit.disabled = true; submit.textContent = "Guardando…";
+      try {
+        const updated = await updateProject(project, {
+          codigo: data.get("codigo")?.trim() || null,
+          nombre_corto: data.get("nombre_corto")?.trim() || null,
+          nombre: data.get("nombre")?.trim(),
+          descripcion: data.get("descripcion")?.trim() || null,
+          objetivo_general: data.get("objetivo_general")?.trim() || null,
+          responsable: data.get("responsable")?.trim() || null,
+          fecha_inicio: start, fecha_fin: end, estado: data.get("estado"),
+          tiene_financiacion: financed.checked,
+          valor_estimado: financed.checked && data.get("valor_estimado") !== "" ? Number(data.get("valor_estimado")) : null,
+          orden: Number(data.get("orden") || 0)
+        }, selectedMandates);
+        project = updated;
+        mandateIds = selectedMandates;
+        await updateActivity(activity, {
+          codigo: updated.codigo, nombre: updated.nombre,
+          descripcion: updated.descripcion || updated.objetivo_general || null,
+          responsable: updated.responsable, fecha_inicio: updated.fecha_inicio, fecha_fin: updated.fecha_fin,
+          estado: projectStateToActivityState(updated.estado),
+          tiene_financiacion: Boolean(updated.tiene_financiacion)
+        });
+        await refreshCurrentActivityData();
+        renderActivityWorkspace();
+        showToast("Actividad general actualizada.");
+      } catch (error) {
+        console.error(error); message.textContent = friendlyErrorMessage(error, "No fue posible guardar la Actividad general."); submit.disabled = false; submit.textContent = "Guardar cambios";
+      }
+    });
   }
 
   function renderActivityGeneral() {
     const activity = currentActivity();
+    if (isGeneralActivityUnit(project)) { renderGeneralUnitProfile(activity); return; }
     const body = container.querySelector("#activityWorkspaceBody");
     body.innerHTML = `
       <form id="activityGeneralForm" class="workspace-form-page">
@@ -1437,6 +1618,7 @@ export async function renderProyectoWorkspace(container, options) {
             <div class="form-field"><label>Fecha de inicio</label><input name="fecha_inicio" type="date" value="${escapeHTML(activity.fecha_inicio || "")}"></div>
             <div class="form-field"><label>Fecha de cierre</label><input name="fecha_fin" type="date" value="${escapeHTML(activity.fecha_fin || "")}"></div>
             <div class="form-field"><label>Estado</label><select name="estado">${option("borrador", "Borrador", activity.estado === "borrador")}${option("programada", "Programada", activity.estado === "programada")}${option("en_ejecucion", "En ejecución", activity.estado === "en_ejecucion")}${option("suspendida", "Suspendida", activity.estado === "suspendida")}${option("completada", "Completada", activity.estado === "completada")}${option("cancelada", "Cancelada", activity.estado === "cancelada")}</select></div>
+            <div class="form-field"><label class="checkbox-inline"><input name="tiene_financiacion" type="checkbox" ${activity.tiene_financiacion ? "checked" : ""}><span>Tiene financiación / maneja presupuesto</span></label><small class="field-help">Actívalo cuando esta Actividad requiera control presupuestal. Si ya tiene rubros históricos, Presupuesto seguirá visible.</small></div>
             <div class="form-field"><label>Color en Planeador</label><select name="planeador_color">${plannerColorOptions().map((item) => option(item.value, item.label, (activity.planeador_color || "") === item.value)).join("")}</select></div>
           </div>
         </section>
@@ -1452,7 +1634,7 @@ export async function renderProyectoWorkspace(container, options) {
       if (start && end && end < start) { message.textContent = "La fecha final no puede ser anterior a la fecha inicial."; return; }
       const submit = form.querySelector('button[type="submit"]'); submit.disabled = true; submit.textContent = "Guardando…";
       try {
-        await updateActivity(activity, { codigo: data.get("codigo")?.trim() || null, nombre: data.get("nombre")?.trim(), descripcion: data.get("descripcion")?.trim() || null, responsable: data.get("responsable")?.trim() || null, fecha_inicio: start, fecha_fin: end, estado: data.get("estado"), planeador_color: data.get("planeador_color") || null, orden: Number(data.get("orden") || 0) });
+        await updateActivity(activity, { codigo: data.get("codigo")?.trim() || null, nombre: data.get("nombre")?.trim(), descripcion: data.get("descripcion")?.trim() || null, responsable: data.get("responsable")?.trim() || null, fecha_inicio: start, fecha_fin: end, estado: data.get("estado"), tiene_financiacion: data.get("tiene_financiacion") === "on", planeador_color: data.get("planeador_color") || null, orden: Number(data.get("orden") || 0) });
         await refreshCurrentActivityData();
         renderActivityWorkspace();
         showToast("Actividad actualizada.");
@@ -1491,7 +1673,7 @@ export async function renderProyectoWorkspace(container, options) {
             closeModal();
             await refreshCurrentActivityData();
             renderActivityWorkspace();
-            activityTab = "indicadores";
+            activityTab = "avance";
             renderActivityTab();
             showToast("Indicador inactivado.");
           } catch (error) {
@@ -1515,7 +1697,7 @@ export async function renderProyectoWorkspace(container, options) {
         closeModal();
         await refreshCurrentActivityData();
         renderActivityWorkspace();
-        activityTab = "indicadores";
+        activityTab = "avance";
         renderActivityTab();
         showToast("Indicador eliminado.");
       } catch (error) {
@@ -1531,7 +1713,7 @@ export async function renderProyectoWorkspace(container, options) {
     const rows = indicatorsForActivity(activity.id);
     body.innerHTML = `
       <section class="workspace-section workspace-section-flush">
-        <div class="workspace-section-heading"><div><p class="eyebrow">Medición</p><h3>Indicadores de la actividad</h3><p class="muted">El avance de la actividad se calcula automáticamente con los indicadores activos.</p></div><button id="newIndicatorButton" class="btn btn-primary" type="button">+ Nuevo indicador</button></div>
+        <div class="workspace-section-heading"><div><p class="eyebrow">Medición</p><h3>Indicadores de ${isGeneralActivityUnit(project) ? "la Actividad general" : "la actividad"}</h3><p class="muted">El avance de la actividad se calcula automáticamente con los indicadores activos.</p></div><button id="newIndicatorButton" class="btn btn-primary" type="button">+ Nuevo indicador</button></div>
         ${rows.length ? `<div class="indicator-card-list">${rows.map((indicator) => {
           const progress = calculateIndicatorProgress(indicator);
           return `<article id="audit-indicator-${indicator.id}" class="indicator-work-card ${indicator.estado === "inactivo" ? "is-inactive" : ""}">
@@ -1550,11 +1732,11 @@ export async function renderProyectoWorkspace(container, options) {
       </section>`;
 
     body.querySelector("#newIndicatorButton").addEventListener("click", () => {
-      openIndicatorForm({ activityId: activity.id, onSaved: async () => { await refreshCurrentActivityData(); renderActivityWorkspace(); activityTab = "indicadores"; renderActivityTab(); showToast("Indicador creado."); } });
+      openIndicatorForm({ activityId: activity.id, onSaved: async () => { await refreshCurrentActivityData(); renderActivityWorkspace(); activityTab = "avance"; renderActivityTab(); showToast("Indicador creado."); } });
     });
     body.querySelectorAll(".indicator-followup").forEach((button) => button.addEventListener("click", () => {
       const indicator = rows.find((item) => item.id === button.dataset.id);
-      openIndicatorFollowup({ indicator, onSaved: async () => { await refreshCurrentActivityData(); renderActivityWorkspace(); activityTab = "indicadores"; renderActivityTab(); showToast("Avance del indicador registrado."); } });
+      openIndicatorFollowup({ indicator, onSaved: async () => { await refreshCurrentActivityData(); renderActivityWorkspace(); activityTab = "avance"; renderActivityTab(); showToast("Avance del indicador registrado."); } });
     }));
     body.querySelectorAll(".audit-indicator-note").forEach((button) => button.addEventListener("click", () => {
       const indicator = rows.find((item) => item.id === button.dataset.id);
@@ -1568,7 +1750,7 @@ export async function renderProyectoWorkspace(container, options) {
           entidadTipo: "indicador",
           entidadId: indicator.id,
           entidadNombre: indicator.codigo || indicator.nombre,
-          seccion: "indicadores",
+          seccion: "avance",
           ruta: `${vigencia.nombre} › ${vigenciaConsejeria.consejerias.nombre_corto} › ${linea.nombre} › ${programa.nombre} › ${project.nombre} › ${activity.nombre} › Indicador ${indicator.codigo || indicator.nombre}`,
           navigation: {
             ...baseAuditNavigation(),
@@ -1576,7 +1758,7 @@ export async function renderProyectoWorkspace(container, options) {
             actividad_id: activity.id,
             actividad_codigo: activity.codigo || "",
             actividad_nombre: activity.nombre,
-            activity_tab: "indicadores",
+            activity_tab: "avance",
             indicador_id: indicator.id,
             indicador_codigo: indicator.codigo || "",
             indicador_nombre: indicator.nombre,
@@ -1588,12 +1770,79 @@ export async function renderProyectoWorkspace(container, options) {
 
     body.querySelectorAll(".edit-indicator").forEach((button) => button.addEventListener("click", () => {
       const indicator = rows.find((item) => item.id === button.dataset.id);
-      openIndicatorForm({ activityId: activity.id, record: indicator, onSaved: async () => { await refreshCurrentActivityData(); renderActivityWorkspace(); activityTab = "indicadores"; renderActivityTab(); showToast("Indicador actualizado."); } });
+      openIndicatorForm({ activityId: activity.id, record: indicator, onSaved: async () => { await refreshCurrentActivityData(); renderActivityWorkspace(); activityTab = "avance"; renderActivityTab(); showToast("Indicador actualizado."); } });
     }));
     body.querySelectorAll(".delete-indicator").forEach((button) => button.addEventListener("click", () => {
       const indicator = rows.find((item) => item.id === button.dataset.id);
       deleteIndicatorSafely(indicator);
     }));
+  }
+
+  async function renderActivityAdvance() {
+    const activity = currentActivity();
+    if (!activity) return;
+
+    // Reutiliza la gestión completa de indicadores y agrega el seguimiento en la misma vista.
+    renderIndicators();
+    const body = container.querySelector("#activityWorkspaceBody");
+    const activityIndicators = indicatorsForActivity(activity.id);
+    const activeIndicators = activityIndicators.filter((indicator) => indicator.estado === "activo");
+    const technicalProgress = calculateActivityProgress(activityIndicators);
+
+    const refreshAdvance = async (toastMessage) => {
+      await refreshCurrentActivityData();
+      renderActivityWorkspace();
+      activityTab = "avance";
+      await renderActivityTab();
+      if (toastMessage) showToast(toastMessage);
+    };
+
+    body.insertAdjacentHTML("afterbegin", `
+      <section class="workspace-section activity-advance-overview">
+        <div class="workspace-section-heading activity-advance-heading">
+          <div><p class="eyebrow">Avance</p><h3>Avance de ${isGeneralActivityUnit(project) ? "la Actividad general" : "la Actividad"}</h3><p class="muted">Aquí registras los resultados de los indicadores y el seguimiento cualitativo. El porcentaje se calcula automáticamente.</p></div>
+          <div class="workspace-heading-actions"><button id="registerActivityAdvance" class="btn btn-primary" type="button">Registrar avance</button><button id="registerActivityFollowup" class="btn btn-secondary" type="button">Registrar seguimiento</button></div>
+        </div>
+        <div class="tracking-summary-grid activity-advance-summary">
+          <div class="tracking-summary-card"><span>Avance técnico</span><strong>${formatPercent(technicalProgress)}</strong><small>Calculado automáticamente</small></div>
+          <div class="tracking-summary-card"><span>Indicadores activos</span><strong>${activeIndicators.length}</strong><small>${activityIndicators.length} registrados</small></div>
+          <div class="tracking-summary-card"><span>Evidencias activas</span><strong>${evidenceForActivity(activity.id).filter((item) => item.estado === "activa").length}</strong><small>Soportes registrados</small></div>
+        </div>
+      </section>`);
+
+    const indicatorHeading = body.querySelector(".workspace-section-flush .workspace-section-heading");
+    if (indicatorHeading) {
+      const title = indicatorHeading.querySelector("h3");
+      const description = indicatorHeading.querySelector(".muted");
+      if (title) title.textContent = "Indicadores y avance técnico";
+      if (description) description.textContent = "Define cómo se mide la Actividad y registra el valor alcanzado en cada corte.";
+    }
+
+    const [followups, indicatorFollowups] = await Promise.all([
+      getActivityFollowups(activity.id),
+      getIndicatorFollowups(activityIndicators.map((item) => item.id))
+    ]);
+    const indicatorMap = new Map(activityIndicators.map((indicator) => [indicator.id, indicator]));
+
+    body.insertAdjacentHTML("beforeend", `
+      <section class="workspace-section workspace-section-flush activity-followup-section">
+        <div class="workspace-section-heading"><div><p class="eyebrow">Seguimiento cualitativo</p><h3>Logros, dificultades y próximos pasos</h3><p class="muted">Complementa el avance numérico con información sobre lo realizado y lo que sigue.</p></div><button id="newActivityFollowupInline" class="btn btn-secondary" type="button">Registrar seguimiento</button></div>
+        ${followups.length ? `<div class="timeline-list">${followups.map((item) => `<article class="timeline-card"><div class="timeline-date">${formatDate(item.fecha_corte)}</div>${item.resumen ? `<div><span>Resumen</span><p>${escapeHTML(item.resumen)}</p></div>` : ""}${item.logros ? `<div><span>Logros</span><p>${escapeHTML(item.logros)}</p></div>` : ""}${item.dificultades ? `<div><span>Dificultades</span><p>${escapeHTML(item.dificultades)}</p></div>` : ""}${item.proximos_pasos ? `<div><span>Próximos pasos</span><p>${escapeHTML(item.proximos_pasos)}</p></div>` : ""}</article>`).join("")}</div>` : `<div class="empty-state workspace-empty"><strong>Aún no hay seguimiento cualitativo.</strong><p>Registra logros, dificultades y próximos pasos cuando hagas un corte de seguimiento.</p></div>`}
+        ${indicatorFollowups.length ? `<details class="historical-records indicator-history"><summary>Ver histórico de valores de indicadores (${indicatorFollowups.length})</summary><div class="timeline-list compact-timeline">${indicatorFollowups.map((item) => { const indicator = indicatorMap.get(item.indicador_id); return `<article class="timeline-card"><div class="timeline-date">${formatDate(item.fecha_corte)}</div><strong>${escapeHTML(indicator?.codigo || indicator?.nombre || "Indicador")}</strong><p>Valor: <strong>${formatNumber(item.valor, 4)}</strong>${indicator?.unidad_medida ? ` ${escapeHTML(indicator.unidad_medida)}` : ""}</p>${item.observacion ? `<p class="muted">${escapeHTML(item.observacion)}</p>` : ""}</article>`; }).join("")}</div></details>` : ""}
+      </section>`);
+
+    const registerAdvance = () => openActivityAdvanceChooser({
+      indicators: activityIndicators,
+      onSaved: async () => refreshAdvance("Avance registrado.")
+    });
+    const registerFollowup = () => openActivityFollowup({
+      activityId: activity.id,
+      onSaved: async () => refreshAdvance("Seguimiento registrado.")
+    });
+
+    body.querySelector("#registerActivityAdvance")?.addEventListener("click", registerAdvance);
+    body.querySelector("#registerActivityFollowup")?.addEventListener("click", registerFollowup);
+    body.querySelector("#newActivityFollowupInline")?.addEventListener("click", registerFollowup);
   }
 
   function renderBudget() {
@@ -1603,7 +1852,7 @@ export async function renderProyectoWorkspace(container, options) {
     const metrics = calculateBudgetMetrics(rows);
     body.innerHTML = `
       <section class="workspace-section workspace-section-flush">
-        <div class="workspace-section-heading"><div><p class="eyebrow">Finanzas</p><h3>Presupuesto de la actividad</h3><p class="muted">El presupuesto se controla de forma independiente al avance técnico.</p></div><button id="newBudgetButton" class="btn btn-primary" type="button">+ Nuevo rubro</button></div>
+        <div class="workspace-section-heading"><div><p class="eyebrow">Finanzas</p><h3>Presupuesto de ${isGeneralActivityUnit(project) ? "la Actividad general" : "la actividad"}</h3><p class="muted">El presupuesto se controla de forma independiente al avance técnico.</p></div><button id="newBudgetButton" class="btn btn-primary" type="button">+ Nuevo rubro</button></div>
         <div class="tracking-summary-grid budget-summary-grid"><div class="tracking-summary-card"><span>Programado</span><strong>${formatMoney(metrics.programmed)}</strong></div><div class="tracking-summary-card"><span>Ejecutado</span><strong>${formatMoney(metrics.executed)}</strong></div><div class="tracking-summary-card"><span>Ejecución presupuestal</span><strong>${formatPercent(metrics.execution)}</strong></div></div>
         ${rows.length ? `<div class="table-wrap"><table class="data-table workspace-data-table"><thead><tr><th>Rubro</th><th>Programado</th><th>Ejecutado</th><th>Ejecución</th><th>Estado</th><th></th></tr></thead><tbody>${rows.map((item) => {
           const execution = Number(item.programado || 0) > 0 ? Math.min(100, Number(item.ejecutado || 0) / Number(item.programado || 0) * 100) : null;
@@ -1648,7 +1897,7 @@ export async function renderProyectoWorkspace(container, options) {
     const indicatorMap = new Map(activityIndicators.map((indicator) => [indicator.id, indicator]));
     body.innerHTML = `
       <section class="workspace-section workspace-section-flush">
-        <div class="workspace-section-heading"><div><p class="eyebrow">Soportes</p><h3>Evidencias de la actividad</h3><p class="muted">Una evidencia puede ser general de la actividad o asociarse a un indicador específico.</p></div><button id="newEvidenceButton" class="btn btn-primary" type="button">+ Nueva evidencia</button></div>
+        <div class="workspace-section-heading"><div><p class="eyebrow">Soportes</p><h3>Evidencias de ${isGeneralActivityUnit(project) ? "la Actividad general" : "la actividad"}</h3><p class="muted">Una evidencia puede ser general de la actividad o asociarse a un indicador específico.</p></div><button id="newEvidenceButton" class="btn btn-primary" type="button">+ Nueva evidencia</button></div>
         ${rows.length ? `<div class="evidence-grid">${rows.map((item) => {
           const indicator = indicatorMap.get(item.indicador_id);
           return `<article class="evidence-card ${item.estado === "archivada" ? "is-archived" : ""}"><div class="evidence-card-heading"><div><p class="eyebrow">${escapeHTML(item.tipo || "Evidencia")}</p><h4>${escapeHTML(item.nombre)}</h4></div><span class="status-chip ${item.estado === "activa" ? "active" : "closed"}">${item.estado === "activa" ? "Activa" : "Archivada"}</span></div><p class="muted">${escapeHTML(item.descripcion || "Sin descripción.")}</p><div class="evidence-meta"><span>Fecha<strong>${formatDate(item.fecha)}</strong></span><span>Indicador<strong>${indicator ? escapeHTML(indicator.codigo || indicator.nombre) : "Actividad"}</strong></span></div>${item.url ? `<a class="evidence-link" href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer">Abrir soporte ↗</a>` : ""}<div class="entity-actions"><button class="btn btn-secondary edit-evidence" type="button" data-id="${item.id}">Editar</button>${item.estado === "activa" ? `<button class="btn btn-secondary archive-evidence" type="button" data-id="${item.id}">Archivar</button>` : `<button class="btn btn-secondary restore-evidence" type="button" data-id="${item.id}">Reactivar</button>`}</div></article>`;
@@ -1677,7 +1926,7 @@ export async function renderProyectoWorkspace(container, options) {
     const indicatorMap = new Map(activityIndicators.map((indicator) => [indicator.id, indicator]));
     body.innerHTML = `
       <section class="workspace-section workspace-section-flush">
-        <div class="workspace-section-heading"><div><p class="eyebrow">Histórico</p><h3>Seguimiento de la actividad</h3><p class="muted">Los registros se agregan por fecha de corte y no sustituyen el histórico anterior.</p></div><button id="newActivityFollowupButton" class="btn btn-primary" type="button">+ Nuevo seguimiento</button></div>
+        <div class="workspace-section-heading"><div><p class="eyebrow">Histórico</p><h3>Seguimiento de ${isGeneralActivityUnit(project) ? "la Actividad general" : "la actividad"}</h3><p class="muted">Los registros se agregan por fecha de corte y no sustituyen el histórico anterior.</p></div><button id="newActivityFollowupButton" class="btn btn-primary" type="button">+ Nuevo seguimiento</button></div>
         <div class="tracking-columns">
           <section><h4>Seguimientos narrativos</h4>${followups.length ? `<div class="timeline-list">${followups.map((item) => `<article class="timeline-card"><div class="timeline-date">${formatDate(item.fecha_corte)}</div>${item.resumen ? `<div><span>Resumen</span><p>${escapeHTML(item.resumen)}</p></div>` : ""}${item.logros ? `<div><span>Logros</span><p>${escapeHTML(item.logros)}</p></div>` : ""}${item.dificultades ? `<div><span>Dificultades</span><p>${escapeHTML(item.dificultades)}</p></div>` : ""}${item.proximos_pasos ? `<div><span>Próximos pasos</span><p>${escapeHTML(item.proximos_pasos)}</p></div>` : ""}</article>`).join("")}</div>` : `<div class="empty-inline">No hay seguimientos narrativos registrados.</div>`}</section>
           <section><h4>Histórico de indicadores</h4>${indicatorFollowups.length ? `<div class="timeline-list compact-timeline">${indicatorFollowups.map((item) => {
@@ -1697,20 +1946,21 @@ export async function renderProyectoWorkspace(container, options) {
 
     const labels = {
       general: "General",
-      indicadores: "Indicadores",
+      avance: "Avance",
       presupuesto: "Presupuesto",
-      evidencias: "Evidencias",
-      seguimiento: "Seguimiento"
+      evidencias: "Evidencias"
     };
 
     setAuditContext({
       vigenciaId: vigencia.id,
       vigenciaNombre: vigencia.nombre,
-      entidadTipo: "actividad",
-      entidadId: activity.id,
-      entidadNombre: activity.nombre,
+      entidadTipo: isGeneralActivityUnit(project) ? "proyecto" : "actividad",
+      entidadId: isGeneralActivityUnit(project) ? project.id : activity.id,
+      entidadNombre: isGeneralActivityUnit(project) ? project.nombre : activity.nombre,
       seccion: activityTab,
-      ruta: `${vigencia.nombre} › ${vigenciaConsejeria.consejerias.nombre_corto} › ${linea.nombre} › ${programa.nombre} › ${project.nombre} › ${activity.nombre} › ${labels[activityTab] || activityTab}`,
+      ruta: isGeneralActivityUnit(project)
+        ? `${vigencia.nombre} › ${vigenciaConsejeria.consejerias.nombre_corto} › ${linea.nombre} › ${programa.nombre} › ${project.nombre} › ${labels[activityTab] || activityTab}`
+        : `${vigencia.nombre} › ${vigenciaConsejeria.consejerias.nombre_corto} › ${linea.nombre} › ${programa.nombre} › ${project.nombre} › ${activity.nombre} › ${labels[activityTab] || activityTab}`,
       navigation: {
         ...baseAuditNavigation(),
         project_tab: "actividades",
@@ -1721,21 +1971,21 @@ export async function renderProyectoWorkspace(container, options) {
       },
       sectionOptions: [
         { value: "general", label: "General", navigation: { activity_tab: "general" } },
-        { value: "indicadores", label: "Indicadores", navigation: { activity_tab: "indicadores" } },
-        { value: "presupuesto", label: "Presupuesto", navigation: { activity_tab: "presupuesto" } },
+        { value: "avance", label: "Avance", navigation: { activity_tab: "avance" } },
         { value: "evidencias", label: "Evidencias", navigation: { activity_tab: "evidencias" } },
-        { value: "seguimiento", label: "Seguimiento", navigation: { activity_tab: "seguimiento" } }
+        ...(activityHasBudgetAccess(project, activity, budgetForActivity(activity.id)) ? [{ value: "presupuesto", label: "Presupuesto", navigation: { activity_tab: "presupuesto" } }] : [])
       ]
     });
   }
 
-  function renderActivityTab() {
+  async function renderActivityTab() {
+    const activity = currentActivity();
+    if (activity) activityTab = normalizeActivityTab(activityTab, project, activity, budgetForActivity(activity.id));
     syncActivityAuditContext();
     container.querySelectorAll("[data-activity-tab]").forEach((button) => button.classList.toggle("active", button.dataset.activityTab === activityTab));
-    if (activityTab === "indicadores") renderIndicators();
+    if (activityTab === "avance") await renderActivityAdvance();
     else if (activityTab === "presupuesto") renderBudget();
     else if (activityTab === "evidencias") renderEvidence();
-    else if (activityTab === "seguimiento") renderActivityTracking().catch((error) => { console.error(error); showToast(friendlyErrorMessage(error, "No fue posible cargar el seguimiento.")); });
     else renderActivityGeneral();
   }
 
@@ -1749,7 +1999,14 @@ export async function renderProyectoWorkspace(container, options) {
       currentActivityId = null;
     }
 
-    renderShell();
+    if (isGeneralActivityUnit(project)) {
+      const principal = activities.find((item) => item.id === project.actividad_principal_id) || activities[0] || null;
+      currentActivityId = principal?.id || null;
+      activityTab = options.initialActivityTab || "general";
+      renderActivityWorkspace();
+    } else {
+      renderShell();
+    }
 
     if (initialAnchor) {
       setTimeout(() => {
@@ -1773,7 +2030,7 @@ export async function renderProyectoWorkspace(container, options) {
     }
   } catch (error) {
     console.error(error);
-    container.innerHTML = `<section class="panel" style="margin-top:0"><p class="eyebrow">Proyecto</p><h2>No fue posible abrir el espacio de trabajo</h2><p class="muted">${escapeHTML(friendlyErrorMessage(error, "No fue posible cargar la información del Proyecto. Intenta nuevamente o informa al administrador del Sistema."))}</p><div style="margin-top:16px"><button id="workspaceErrorBack" class="btn btn-secondary" type="button">Volver a proyectos</button></div></section>`;
+    container.innerHTML = `<section class="panel" style="margin-top:0"><p class="eyebrow">Proyecto</p><h2>No fue posible abrir el espacio de trabajo</h2><p class="muted">${escapeHTML(friendlyErrorMessage(error, "No fue posible cargar la información del Proyecto. Intenta nuevamente o informa al administrador del Sistema."))}</p><div style="margin-top:16px"><button id="workspaceErrorBack" class="btn btn-secondary" type="button">Volver a Proyectos / Actividades</button></div></section>`;
     container.querySelector("#workspaceErrorBack").addEventListener("click", onBack);
   }
 }

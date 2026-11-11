@@ -1,8 +1,8 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
-import { logManualEvent } from "../security.js?v=5.3.1";
-import { openModal, closeModal } from "../components/modal.js?v=5.3.1";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.3.1";
-import { uiIcon } from "../components/uiSystem.js?v=5.3.1";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
+import { logManualEvent } from "../security.js?v=5.4.2";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.2";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.2";
+import { uiIcon } from "../components/uiSystem.js?v=5.4.2";
 
 const SUPPORTED_SCHEMA = "onic-buen-gobierno.v1";
 const MAX_FILE_BYTES = 12 * 1024 * 1024;
@@ -654,6 +654,50 @@ function expectedResultHTML(payload) {
   `;
 }
 
+async function restoreUnitTypes(payload, vigenciaId) {
+  const rows = payload?.metadata?.unidad_tipos;
+  if (!Array.isArray(rows) || !rows.length || !vigenciaId) return;
+  const supabase = requireSupabase();
+
+  const { data: vcs, error: vcError } = await supabase.from("vigencia_consejerias").select("id,consejerias(nombre_corto,nombre_largo)").eq("vigencia_id", vigenciaId);
+  if (vcError) throw vcError;
+  const vcIds = (vcs || []).map((row) => row.id);
+  const { data: lines, error: lineError } = vcIds.length ? await supabase.from("lineas_accion").select("id,vigencia_consejeria_id,nombre").in("vigencia_consejeria_id", vcIds) : { data: [], error: null };
+  if (lineError) throw lineError;
+  const lineIds = (lines || []).map((row) => row.id);
+  const { data: programs, error: programError } = lineIds.length ? await supabase.from("programas").select("id,linea_accion_id,nombre").in("linea_accion_id", lineIds) : { data: [], error: null };
+  if (programError) throw programError;
+  const programIds = (programs || []).map((row) => row.id);
+  const { data: projects, error: projectError } = programIds.length ? await supabase.from("proyectos").select("id,programa_id,codigo,nombre").in("programa_id", programIds) : { data: [], error: null };
+  if (projectError) throw projectError;
+
+  const vcMap = new Map((vcs || []).map((row) => [row.id, row]));
+  const lineMap = new Map((lines || []).map((row) => [row.id, row]));
+  const programMap = new Map((programs || []).map((row) => [row.id, row]));
+  const norm = (value) => String(value || "").trim().toLocaleLowerCase("es");
+
+  for (const saved of rows) {
+    const project = (projects || []).find((candidate) => {
+      const program = programMap.get(candidate.programa_id);
+      const line = lineMap.get(program?.linea_accion_id);
+      const vc = vcMap.get(line?.vigencia_consejeria_id);
+      const council = vc?.consejerias?.nombre_corto || vc?.consejerias?.nombre_largo;
+      return norm(council) === norm(saved.consejeria) && norm(line?.nombre) === norm(saved.linea) && norm(program?.nombre) === norm(saved.programa) && ((saved.codigo && norm(candidate.codigo) === norm(saved.codigo)) || (!saved.codigo && norm(candidate.nombre) === norm(saved.nombre)));
+    });
+    if (!project) continue;
+
+    const { data: activities, error: activityError } = await supabase.from("actividades").select("id,codigo,nombre").eq("proyecto_id", project.id);
+    if (activityError) throw activityError;
+    const principal = (activities || []).find((activity) => {
+      if (!saved.actividad_principal) return false;
+      return (saved.actividad_principal.codigo && norm(activity.codigo) === norm(saved.actividad_principal.codigo)) || norm(activity.nombre) === norm(saved.actividad_principal.nombre);
+    }) || (activities || [])[0] || null;
+
+    const { error: updateError } = await supabase.from("proyectos").update({ tipo_unidad: saved.tipo_unidad === "actividad_general" ? "actividad_general" : "proyecto", actividad_principal_id: principal?.id || null }).eq("id", project.id);
+    if (updateError) throw updateError;
+  }
+}
+
 export function openVigenciaImportDialog({
   onImported
 }) {
@@ -668,7 +712,7 @@ export function openVigenciaImportDialog({
         <p>
           Carga una Vigencia completa con Consejerías,
           Mandatos, Biblioteca, Líneas, Programas,
-          Proyectos, Actividades, Indicadores,
+          Proyectos / Actividades generales, Indicadores,
           Presupuesto, Evidencias y Seguimientos.
         </p>
 
@@ -1033,7 +1077,7 @@ export function openVigenciaImportDialog({
             counts.programas
           )}
           ${previewMetric(
-            "Proyectos",
+            "Unidades de gestión",
             counts.proyectos
           )}
           ${previewMetric(
@@ -1153,6 +1197,8 @@ export function openVigenciaImportDialog({
 
         if (error) throw error;
 
+        await restoreUnitTypes(payload, data?.vigencia_id || null);
+
         const summary =
           data?.resumen || {};
 
@@ -1211,7 +1257,7 @@ export function openVigenciaImportDialog({
                 summary.programas
               )}
               ${previewMetric(
-                "Proyectos",
+                "Unidades de gestión",
                 summary.proyectos
               )}
               ${previewMetric(

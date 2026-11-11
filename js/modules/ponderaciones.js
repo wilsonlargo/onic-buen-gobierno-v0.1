@@ -1,8 +1,8 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
-import { canApproveWeights } from "../security.js?v=5.3.1";
-import { openModal, closeModal } from "../components/modal.js?v=5.3.1";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.3.1";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.3.1";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
+import { canApproveWeights } from "../security.js?v=5.4.2";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.2";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.2";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.2";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -172,7 +172,7 @@ async function getHierarchy(vigenciaConsejeriaId) {
   if (programIds.length) {
     const { data, error } = await supabase
       .from("proyectos")
-      .select("id,programa_id,codigo,nombre,nombre_corto,descripcion,estado,ponderacion,metodo_ponderacion,orden,row_version")
+      .select("id,programa_id,codigo,nombre,nombre_corto,descripcion,estado,ponderacion,metodo_ponderacion,orden,row_version,tipo_unidad,actividad_principal_id")
       .in("programa_id", programIds)
       .order("orden", { ascending: true })
       .order("nombre", { ascending: true });
@@ -299,13 +299,13 @@ function approvalHelpHTML() {
             <strong>Qué representa</strong>
             <p>
               La ponderación define cuánto aporta cada Proyecto al resultado de su Programa.
-              No equivale al avance ni al presupuesto. Solo se edita en los Proyectos.
+              No equivale al avance ni al presupuesto. Solo se edita en las unidades del Programa.
             </p>
           </div>
           <div>
             <strong>Reglas principales</strong>
             <ul>
-              <li>La suma de los Proyectos de cada Programa debe ser exactamente 100 %.</li>
+              <li>La suma de Proyectos y Actividades generales de cada Programa debe ser exactamente 100 %.</li>
               <li><strong>Ponderación sugerida</strong> reparte el 100 % por partes iguales y luego puede ajustarse.</li>
               <li>Considere relevancia estratégica, resultados esperados y contribución a los Mandatos.</li>
               <li>No use el presupuesto como único criterio.</li>
@@ -377,7 +377,7 @@ export async function renderPonderaciones(container, navigationTarget = null) {
         <h2>Selecciona la Consejería</h2>
         <p class="muted">
           Selecciona la Vigencia y la Consejería para desplegar en una sola vista
-          sus Líneas de Acción, Programas y Proyectos.
+          sus Líneas de Acción, Programas y unidades de gestión.
         </p>
       </div>
 
@@ -462,7 +462,7 @@ export async function renderPonderaciones(container, navigationTarget = null) {
   function programState(program) {
     const rows = projectsForProgram(program.id);
     if (!rows.length) {
-      return { type: "empty", label: "Sin Proyectos", detail: "El Programa no requiere distribución." };
+      return { type: "empty", label: "Sin unidades", detail: "El Programa no requiere distribución." };
     }
     const invalid = rows.some((project) => {
       const value = Number(currentDraft.get(project.id));
@@ -593,7 +593,7 @@ export async function renderPonderaciones(container, navigationTarget = null) {
         <div class="ponderacion-summary-grid">
           <div><span>Líneas activas</span><strong>${activeLines().length}</strong></div>
           <div><span>Programas activos</span><strong>${activeProgramList().length}</strong></div>
-          <div><span>Proyectos</span><strong>${proyectos.length}</strong></div>
+          <div><span>Unidades</span><strong>${proyectos.length}</strong></div>
           <div class="${review.errors ? "warning" : "ok"}"><span>Programas completos</span><strong>${review.complete} / ${review.total}</strong></div>
         </div>
 
@@ -669,7 +669,7 @@ export async function renderPonderaciones(container, navigationTarget = null) {
                           <table class="ponderacion-project-table">
                             <thead>
                               <tr>
-                                <th>Proyecto</th>
+                                <th>Unidad</th>
                                 <th>Actual</th>
                                 <th>Propuesta</th>
                                 <th>Avance</th>
@@ -686,9 +686,9 @@ export async function renderPonderaciones(container, navigationTarget = null) {
                                 return `
                                   <tr id="audit-ponderacion-proyecto-${project.id}" class="${changed ? "has-draft-change" : ""}">
                                     <td>
-                                      <span class="project-code">${escapeHTML(project.codigo || "Proyecto")}</span>
+                                      <span class="project-code">${escapeHTML(project.codigo || (project.tipo_unidad === "actividad_general" ? "Actividad" : "Proyecto"))}</span>
                                       <strong>${escapeHTML(project.nombre)}</strong>
-                                      <small>${escapeHTML(project.estado || "")}</small>
+                                      <small>${project.tipo_unidad === "actividad_general" ? "Actividad general · " : "Proyecto · "}${escapeHTML(project.estado || "")}</small>
                                     </td>
                                     <td class="ponderacion-current-value">${formatPercent(currentValue)}</td>
                                     <td>
@@ -721,7 +721,7 @@ export async function renderPonderaciones(container, navigationTarget = null) {
                             </tbody>
                           </table>
                         </div>
-                      ` : `<div class="empty-inline">Este Programa todavía no tiene Proyectos.</div>`}
+                      ` : `<div class="empty-inline">Este Programa todavía no tiene Proyectos ni Actividades generales.</div>`}
 
                       <div class="ponderacion-program-total ${escapeHTML(state.type)}">
                         <div><span>Asignado</span><strong>${formatPercent(total)}</strong></div>
@@ -754,7 +754,7 @@ export async function renderPonderaciones(container, navigationTarget = null) {
           </div>
         </div>
 
-        <textarea id="ponderacionDescription" rows="5" placeholder="Ej. La distribución prioriza los Proyectos con mayor relevancia estratégica y contribución a los Mandatos de la Vigencia…">${escapeHTML(approvalDescription)}</textarea>
+        <textarea id="ponderacionDescription" rows="5" placeholder="Ej. La distribución prioriza las unidades con mayor relevancia estratégica y contribución a los Mandatos de la Vigencia…">${escapeHTML(approvalDescription)}</textarea>
 
         <div class="ponderacion-review ${review.errors ? "has-errors" : "is-complete"}">
           <div><span>Programas revisados</span><strong>${review.total}</strong></div>
@@ -901,7 +901,7 @@ export async function renderPonderaciones(container, navigationTarget = null) {
           <span class="context-label">Consejería</span>
           <h3>${escapeHTML(cName)}</h3>
           <p>
-            Se actualizarán las ponderaciones oficiales de <strong>${approvalRows().length} Proyectos</strong>
+            Se actualizarán las ponderaciones oficiales de <strong>${approvalRows().length} unidades</strong>
             distribuidos en <strong>${review.total} Programas</strong>.
           </p>
           <div class="ponderacion-confirm-description">

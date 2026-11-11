@@ -1,7 +1,7 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
-import { updateWithVersion } from "../security.js?v=5.3.1";
-import { openModal, closeModal } from "../components/modal.js?v=5.3.1";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.3.1";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
+import { updateWithVersion } from "../security.js?v=5.4.2";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.2";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.2";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -284,7 +284,7 @@ async function deleteMandatosByIds(vigenciaId, ids = []) {
 
   if (protectedIds.length) {
     throw new Error(
-      `${protectedIds.length} ${protectedIds.length === 1 ? "mandato está vinculado" : "mandatos están vinculados"} a Proyectos y no pueden eliminarse. Archívalos para conservar la trazabilidad.`
+      `${protectedIds.length} ${protectedIds.length === 1 ? "mandato está vinculado" : "mandatos están vinculados"} a unidades de gestión y no pueden eliminarse. Archívalos para conservar la trazabilidad.`
     );
   }
 
@@ -322,7 +322,7 @@ async function deleteAllMandatos(vigenciaId, expectedCount) {
 
   if (protectedIds.length) {
     throw new Error(
-      `${protectedIds.length} ${protectedIds.length === 1 ? "mandato está vinculado" : "mandatos están vinculados"} a Proyectos. No se eliminó ningún mandato.`
+      `${protectedIds.length} ${protectedIds.length === 1 ? "mandato está vinculado" : "mandatos están vinculados"} a unidades de gestión. No se eliminó ningún mandato.`
     );
   }
 
@@ -362,7 +362,7 @@ async function openDeleteMandatoDialog({ record, onDeleted }) {
 
           <p>
             Por seguridad, la eliminación queda bloqueada hasta poder
-            comprobar si está relacionado con algún Proyecto.
+            comprobar si está relacionado con alguna unidad de gestión.
           </p>
         </div>
 
@@ -383,21 +383,21 @@ async function openDeleteMandatoDialog({ record, onDeleted }) {
 
   if (projectCount > 0) {
     openModal({
-      title: "Mandato vinculado a Proyectos",
+      title: "Mandato vinculado a unidades de gestión",
       content: `
         <div class="danger-callout">
           <strong>${escapeHTML(record.codigo || record.titulo || "Mandato")}</strong>
 
           <p>
             Este Mandato está relacionado con
-            <strong>${projectCount} ${projectCount === 1 ? "Proyecto" : "Proyectos"}</strong>.
+            <strong>${projectCount} ${projectCount === 1 ? "unidad" : "unidades"}</strong>.
             No puede eliminarse físicamente porque forma parte de la trazabilidad
             del Plan Estratégico.
           </p>
         </div>
 
         <p class="muted">
-          Puedes archivarlo. Los Proyectos conservarán su relación histórica.
+          Puedes archivarlo. Las unidades conservarán su relación histórica, pero el Mandato dejará de contarse dentro del total vigente.
         </p>
 
         <p id="protectedMandatoMessage" class="form-message"></p>
@@ -500,7 +500,7 @@ async function openDeleteMandatoDialog({ record, onDeleted }) {
 
       if (currentProjectCount > 0) {
         throw new Error(
-          "El Mandato ahora está vinculado a un Proyecto y ya no puede eliminarse."
+          "El Mandato ahora está vinculado a una unidad de gestión y ya no puede eliminarse."
         );
       }
 
@@ -1629,10 +1629,12 @@ export async function renderMandatos(container, navigationTarget = null) {
       getMandatos(selectedVigenciaId)
     ]);
 
-    mandatoCount.textContent = String(mandatos.length);
+    const currentMandatos = mandatos.filter((mandato) => mandato.estado !== "archivado");
+    const archivedMandatos = mandatos.filter((mandato) => mandato.estado === "archivado");
+    mandatoCount.textContent = String(currentMandatos.length);
     fuenteCount.textContent = String(fuentes.length);
     consejeriaCount.textContent = String(consejerias.length);
-    deleteAllButton.disabled = mandatos.length === 0;
+    deleteAllButton.disabled = currentMandatos.length === 0;
 
     if (!mandatos.length) {
       content.innerHTML = `
@@ -1645,6 +1647,7 @@ export async function renderMandatos(container, navigationTarget = null) {
     }
 
     content.innerHTML = `
+      ${archivedMandatos.length ? `<div class="historical-summary"><strong>${archivedMandatos.length} ${archivedMandatos.length === 1 ? "Mandato archivado" : "Mandatos archivados"}</strong><span>No se incluyen en el total vigente. Permanecen visibles para consulta histórica.</span></div>` : ""}
       <div class="table-wrap">
         <table class="data-table mandatos-table">
           <thead>
@@ -1713,7 +1716,7 @@ export async function renderMandatos(container, navigationTarget = null) {
                         type="button"
                         data-id="${record.id}"
                         aria-label="Eliminar ${escapeHTML(record.codigo || "mandato")}"
-                        title="Eliminar mandato"
+                        title="Eliminar o archivar mandato"
                       >
                         ${trashIcon()}
                       </button>

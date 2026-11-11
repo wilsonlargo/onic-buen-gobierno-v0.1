@@ -1,7 +1,7 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
-import { updateWithVersion } from "../security.js?v=5.3.1";
-import { openModal, closeModal } from "../components/modal.js?v=5.3.1";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.3.1";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
+import { updateWithVersion } from "../security.js?v=5.4.2";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.2";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.2";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -432,7 +432,7 @@ async function openDeleteProgramaDialog({ record, onChanged }) {
           <strong>No se pudo verificar la estructura dependiente.</strong>
           <p>
             Por seguridad, la eliminación queda bloqueada hasta poder comprobar
-            si existen Proyectos asociados.
+            si existen unidades asociadas.
           </p>
         </div>
 
@@ -453,20 +453,20 @@ async function openDeleteProgramaDialog({ record, onChanged }) {
 
   if (proyectos > 0) {
     openModal({
-      title: "El Programa tiene Proyectos",
+      title: "El Programa tiene unidades",
       content: `
         <div class="danger-callout">
           <strong>${escapeHTML(record.nombre)}</strong>
           <p>
             Este Programa contiene
-            <strong>${proyectos} ${proyectos === 1 ? "Proyecto" : "Proyectos"}</strong>.
+            <strong>${proyectos} ${proyectos === 1 ? "unidad" : "unidades"}</strong>.
             No puede eliminarse físicamente porque forma parte de la estructura histórica.
           </p>
         </div>
 
         <p class="muted">
           Puedes marcarlo como <strong>Inactivo</strong> o <strong>Archivado</strong>.
-          Sus Proyectos permanecerán intactos.
+          Sus unidades permanecerán intactas. Si lo archivas, dejará de contarse como Programa vigente y quedará disponible como histórico.
         </p>
 
         <p id="protectedProgramaMessage" class="form-message"></p>
@@ -535,7 +535,7 @@ async function openDeleteProgramaDialog({ record, onChanged }) {
       <div class="danger-callout">
         <strong>${escapeHTML(record.nombre)}</strong>
         <p>
-          Este Programa no contiene Proyectos, por lo que puede eliminarse
+          Este Programa no contiene unidades, por lo que puede eliminarse
           definitivamente.
         </p>
       </div>
@@ -593,7 +593,7 @@ async function openDeleteProgramaDialog({ record, onChanged }) {
 
       if (currentProjects > 0) {
         throw new Error(
-          "El Programa ahora tiene Proyectos asociados y ya no puede eliminarse."
+          "El Programa ahora tiene unidades asociadas y ya no puede eliminarse."
         );
       }
 
@@ -1561,7 +1561,9 @@ export async function renderProgramas(container, navigationTarget = null) {
 
     programas = await getProgramas(linea.id);
 
-    count.textContent = String(programas.length);
+    const currentProgramas = programas.filter((programa) => programa.estado !== "archivado");
+    const archivedProgramas = programas.filter((programa) => programa.estado === "archivado");
+    count.textContent = String(currentProgramas.length);
     updateActions();
 
     if (!programas.length) {
@@ -1619,8 +1621,10 @@ export async function renderProgramas(container, navigationTarget = null) {
         </div>
       </div>
 
+      ${archivedProgramas.length ? `<div class="historical-summary"><strong>${archivedProgramas.length} ${archivedProgramas.length === 1 ? "Programa archivado" : "Programas archivados"}</strong><span>Se conservan como histórico y no se incluyen en el total vigente ni en la ponderación.</span></div>` : ""}
+
       <div class="programas-grid">
-        ${programas.map((programa) => {
+        ${[...currentProgramas, ...archivedProgramas].map((programa) => {
           const weight =
             Number(weights.get(programa.id) || 0);
 
@@ -1631,7 +1635,7 @@ export async function renderProgramas(container, navigationTarget = null) {
             programa.estado === "activo";
 
           return `
-            <article class="programa-card ${!isActive ? "is-inactive" : ""}">
+            <article class="programa-card ${!isActive ? "is-inactive" : ""} ${programa.estado === "archivado" ? "historical-record" : ""}">
               <div class="programa-card-header">
                 <div>
                   <p class="eyebrow">
@@ -1663,12 +1667,12 @@ export async function renderProgramas(container, navigationTarget = null) {
                 </div>
 
                 <div class="calculation-item">
-                  <span>Proyectos</span>
+                  <span>Unidades</span>
                   <strong>${proyectos}</strong>
                   <small>
                     ${proyectos === 1
-                      ? "Proyecto registrado"
-                      : "Proyectos registrados"}
+                      ? "Unidad registrada"
+                      : "Unidades registradas"}
                   </small>
                 </div>
 
@@ -1677,8 +1681,8 @@ export async function renderProgramas(container, navigationTarget = null) {
                   <strong>—</strong>
                   <small>
                     ${proyectos
-                      ? "Se calculará desde Proyectos"
-                      : "Sin Proyectos"}
+                      ? "Se calculará desde sus unidades"
+                      : "Sin unidades"}
                   </small>
                 </div>
 
@@ -1688,7 +1692,7 @@ export async function renderProgramas(container, navigationTarget = null) {
                   <small>
                     ${proyectos
                       ? "Pendiente de cálculo"
-                      : "Sin Proyectos"}
+                      : "Sin unidades"}
                   </small>
                 </div>
               </div>
@@ -1718,8 +1722,8 @@ export async function renderProgramas(container, navigationTarget = null) {
                   class="icon-btn danger delete-programa"
                   type="button"
                   data-id="${programa.id}"
-                  title="Eliminar Programa"
-                  aria-label="Eliminar ${escapeHTML(programa.nombre)}"
+                  title="Eliminar o archivar Programa"
+                  aria-label="Eliminar o archivar ${escapeHTML(programa.nombre)}"
                 >
                   ${trashIcon()}
                 </button>

@@ -1,21 +1,21 @@
-import { supabaseClient, isSupabaseConfigured } from "./supabaseClient.js?v=5.3.1";
-import { renderInicio } from "./modules/inicio.js?v=5.3.1";
-import { renderVigencias } from "./modules/vigencias.js?v=5.3.1";
-import { renderConsejerias } from "./modules/consejerias.js?v=5.3.1";
-import { renderMandatos } from "./modules/mandatos.js?v=5.3.1";
-import { renderSeguimientoMandatos } from "./modules/seguimientoMandatos.js?v=5.3.1";
-import { renderMiTrabajo } from "./modules/miTrabajo.js?v=5.3.1";
-import { renderControlCalidad } from "./modules/controlCalidad.js?v=5.3.1";
-import { initGlobalSearch } from "./modules/buscadorGlobal.js?v=5.3.1";
-import { renderLineas } from "./modules/lineas.js?v=5.3.1";
-import { renderProgramas } from "./modules/programas.js?v=5.3.1";
-import { renderProyectos } from "./modules/proyectos.js?v=5.3.1";
-import { renderPonderaciones } from "./modules/ponderaciones.js?v=5.3.1";
-import { renderCortesSeguimiento } from "./modules/cortesSeguimiento.js?v=5.3.1";
-import { renderAlertasTareas } from "./modules/alertasTareas.js?v=5.3.1";
-import { renderHistorial } from "./modules/historial.js?v=5.3.1";
-import { renderUsuarios } from "./modules/usuarios.js?v=5.3.1";
-import { initAuditoria, clearAuditContext } from "./modules/auditoria.js?v=5.3.1";
+import { supabaseClient, isSupabaseConfigured } from "./supabaseClient.js?v=5.4.2";
+import { renderInicio } from "./modules/inicio.js?v=5.4.2";
+import { renderVigencias } from "./modules/vigencias.js?v=5.4.2";
+import { renderConsejerias } from "./modules/consejerias.js?v=5.4.2";
+import { renderMandatos } from "./modules/mandatos.js?v=5.4.2";
+import { renderSeguimientoMandatos } from "./modules/seguimientoMandatos.js?v=5.4.2";
+import { renderMiTrabajo } from "./modules/miTrabajo.js?v=5.4.2";
+import { renderControlCalidad } from "./modules/controlCalidad.js?v=5.4.2";
+import { initGlobalSearch } from "./modules/buscadorGlobal.js?v=5.4.2";
+import { renderLineas } from "./modules/lineas.js?v=5.4.2";
+import { renderProgramas } from "./modules/programas.js?v=5.4.2";
+import { renderProyectos } from "./modules/proyectos.js?v=5.4.2";
+import { renderPonderaciones } from "./modules/ponderaciones.js?v=5.4.2";
+import { renderCortesSeguimiento } from "./modules/cortesSeguimiento.js?v=5.4.2";
+import { renderAlertasTareas } from "./modules/alertasTareas.js?v=5.4.2";
+import { renderHistorial } from "./modules/historial.js?v=5.4.2";
+import { renderUsuarios } from "./modules/usuarios.js?v=5.4.2";
+import { initAuditoria, clearAuditContext } from "./modules/auditoria.js?v=5.4.2";
 import {
   loadCurrentUserProfile,
   clearSecuritySession,
@@ -26,8 +26,8 @@ import {
   applyViewPermissions,
   startPermissionObserver,
   logSessionEvent
-} from "./security.js?v=5.3.1";
-import { friendlyErrorMessage } from "./userMessages.js?v=5.3.1";
+} from "./security.js?v=5.4.2";
+import { friendlyErrorMessage } from "./userMessages.js?v=5.4.2";
 import {
   initUserInterface,
   enhanceUserInterface,
@@ -36,7 +36,7 @@ import {
   setInterfaceView,
   confirmNavigationAway,
   clearInterfaceDirtyState
-} from "./components/uiSystem.js?v=5.3.1";
+} from "./components/uiSystem.js?v=5.4.2";
 
 const loginView = document.querySelector("#loginView");
 const appView = document.querySelector("#appView");
@@ -63,7 +63,7 @@ const views = {
   consejerias: { title: "Consejerías", render: renderConsejerias },
   lineas: { title: "Líneas de Acción", render: renderLineas },
   programas: { title: "Programas", render: renderProgramas },
-  proyectos: { title: "Proyectos", render: renderProyectos },
+  proyectos: { title: "Proyectos / Actividades", render: renderProyectos },
   ponderaciones: { title: "Ponderaciones", render: renderPonderaciones },
   cortes: { title: "Cortes de seguimiento", render: renderCortesSeguimiento },
   alertas: { title: "Alertas y tareas", render: (container, target) => renderAlertasTareas(container, target, { onNavigate: navigate }) },

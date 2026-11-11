@@ -1,6 +1,6 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
-import { openModal, closeModal } from "../components/modal.js?v=5.3.1";
-import { uiIcon } from "../components/uiSystem.js?v=5.3.1";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.2";
+import { uiIcon } from "../components/uiSystem.js?v=5.4.2";
 
 let cachedIndex = null;
 let cachedAt = 0;
@@ -31,6 +31,7 @@ function iconFor(type) {
     linea: "layers",
     programa: "programs",
     proyecto: "projects",
+    actividad_general: "work",
     actividad: "work",
     indicador: "trend",
     evidencia: "file",
@@ -47,6 +48,7 @@ function typeLabel(type) {
     linea: "Línea de Acción",
     programa: "Programa",
     proyecto: "Proyecto",
+    actividad_general: "Actividad general",
     actividad: "Actividad",
     indicador: "Indicador",
     evidencia: "Evidencia",
@@ -63,7 +65,7 @@ async function fetchAll() {
     supabase.from("vigencia_consejerias").select("id,vigencia_id,consejeria_id,estado,responsable,pueblo,detalle,consejerias(id,nombre_corto,nombre_largo,descripcion)"),
     supabase.from("lineas_accion").select("id,vigencia_consejeria_id,nombre,nombre_corto,descripcion,estado"),
     supabase.from("programas").select("id,linea_accion_id,nombre,nombre_corto,descripcion,estado"),
-    supabase.from("proyectos").select("id,programa_id,codigo,nombre,nombre_corto,descripcion,objetivo_general,responsable,estado"),
+    supabase.from("proyectos").select("id,programa_id,codigo,nombre,nombre_corto,descripcion,objetivo_general,responsable,estado,tipo_unidad,actividad_principal_id"),
     supabase.from("actividades").select("id,proyecto_id,codigo,nombre,descripcion,responsable,estado"),
     supabase.from("indicadores_actividad").select("id,actividad_id,codigo,nombre,unidad_medida,estado"),
     supabase.from("evidencias_actividad").select("id,actividad_id,nombre,descripcion,tipo,estado"),
@@ -180,10 +182,10 @@ function buildIndex(data) {
   data.proyectos.forEach((project) => {
     const ctx = contextForProject(project);
     add({
-      type: "proyecto",
+      type: project.tipo_unidad === "actividad_general" ? "actividad_general" : "proyecto",
       id: project.id,
       title: `${project.codigo ? `${project.codigo} · ` : ""}${project.nombre}`,
-      subtitle: project.responsable || ctx.program?.nombre || "Proyecto",
+      subtitle: project.responsable || ctx.program?.nombre || (project.tipo_unidad === "actividad_general" ? "Actividad general" : "Proyecto"),
       text: `${project.descripcion || ""} ${project.objetivo_general || ""}`,
       route: [ctx.vigencia?.nombre, vcName(ctx.vc), ctx.line?.nombre, ctx.program?.nombre, project.nombre].filter(Boolean).join(" › "),
       navigation: { view: "proyectos", vigencia_id: ctx.vigencia?.id, vigencia_consejeria_id: ctx.vc?.id, linea_id: ctx.line?.id, programa_id: ctx.program?.id, proyecto_id: project.id }
@@ -192,6 +194,7 @@ function buildIndex(data) {
 
   data.actividades.forEach((activity) => {
     const ctx = contextForActivity(activity);
+    if (ctx.project?.tipo_unidad === "actividad_general" && ctx.project?.actividad_principal_id === activity.id) return;
     add({
       type: "actividad",
       id: activity.id,
@@ -212,7 +215,7 @@ function buildIndex(data) {
       title: `${indicator.codigo ? `${indicator.codigo} · ` : ""}${indicator.nombre}`,
       subtitle: indicator.unidad_medida || activity?.nombre || "Indicador",
       route: [ctx.vigencia?.nombre, vcName(ctx.vc), ctx.project?.nombre, activity?.nombre, indicator.nombre].filter(Boolean).join(" › "),
-      navigation: { view: "proyectos", vigencia_id: ctx.vigencia?.id, vigencia_consejeria_id: ctx.vc?.id, linea_id: ctx.line?.id, programa_id: ctx.program?.id, proyecto_id: ctx.project?.id, project_tab: "actividades", actividad_id: activity?.id, activity_tab: "indicadores" }
+      navigation: { view: "proyectos", vigencia_id: ctx.vigencia?.id, vigencia_consejeria_id: ctx.vc?.id, linea_id: ctx.line?.id, programa_id: ctx.program?.id, proyecto_id: ctx.project?.id, project_tab: "actividades", actividad_id: activity?.id, activity_tab: "avance" }
     });
   });
 

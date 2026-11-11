@@ -1,6 +1,6 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
-import { getCurrentProfile } from "../security.js?v=5.3.1";
-import { setAuditContext } from "./auditoria.js?v=5.3.1";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
+import { getCurrentProfile } from "../security.js?v=5.4.2";
+import { setAuditContext } from "./auditoria.js?v=5.4.2";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -119,7 +119,7 @@ async function loadWorkData(vigenciaId, profile) {
   const lineIds = lineas.map((row) => row.id);
   const programas = await getRowsIn("programas", "linea_accion_id", lineIds, "id,linea_accion_id,nombre,estado");
   const programIds = programas.map((row) => row.id);
-  const proyectos = await getRowsIn("proyectos", "programa_id", programIds, "id,programa_id,codigo,nombre,responsable,fecha_inicio,fecha_fin,estado");
+  const proyectos = await getRowsIn("proyectos", "programa_id", programIds, "id,programa_id,codigo,nombre,responsable,fecha_inicio,fecha_fin,estado,tipo_unidad,actividad_principal_id");
   const projectIds = proyectos.map((row) => row.id);
   const actividades = await getRowsIn("actividades", "proyecto_id", projectIds, "id,proyecto_id,codigo,nombre,responsable,fecha_inicio,fecha_fin,estado");
 
@@ -203,7 +203,7 @@ export async function renderMiTrabajo(container, navigationTarget = null) {
         <label for="myWorkVigencia">Vigencia</label>
         <select id="myWorkVigencia"><option value="">Cargando…</option></select>
       </div>
-      <p class="muted">Los compromisos se asignan directamente a tu usuario. Los Proyectos y Actividades se reconocen cuando el campo Responsable coincide con tu nombre o correo.</p>
+      <p class="muted">Los compromisos se asignan directamente a tu usuario. Los Proyectos, Actividades generales y Actividades se reconocen cuando el campo Responsable coincide con tu nombre o correo.</p>
     </section>
 
     <section id="myWorkSummary" class="my-work-summary"><div class="empty-state">Cargando…</div></section>
@@ -230,7 +230,8 @@ export async function renderMiTrabajo(container, navigationTarget = null) {
   }
 
   function ownActivities() {
-    return (data?.actividades || []).filter((activity) => responsibleMatches(activity.responsable, profile));
+    const hiddenPrincipalIds = new Set((data?.proyectos || []).filter((project) => project.tipo_unidad === "actividad_general").map((project) => project.actividad_principal_id).filter(Boolean));
+    return (data?.actividades || []).filter((activity) => activity.estado !== "cancelada" && !hiddenPrincipalIds.has(activity.id) && responsibleMatches(activity.responsable, profile));
   }
 
   function openTasks() {
@@ -254,7 +255,7 @@ export async function renderMiTrabajo(container, navigationTarget = null) {
     summaryHost.innerHTML = `
       <article class="my-work-summary-card"><span>Compromisos abiertos</span><strong>${tasks.length}</strong><small>${overdue.length ? `${overdue.length} vencido${overdue.length === 1 ? "" : "s"}` : "Sin vencidos"}</small></article>
       <article class="my-work-summary-card due"><span>Próximos 7 días</span><strong>${near.length}</strong><small>Compromisos por atender</small></article>
-      <article class="my-work-summary-card"><span>Proyectos a mi cargo</span><strong>${projects.length}</strong><small>Según el campo Responsable</small></article>
+      <article class="my-work-summary-card"><span>Unidades a mi cargo</span><strong>${projects.length}</strong><small>Proyectos y Actividades generales</small></article>
       <article class="my-work-summary-card"><span>Actividades a mi cargo</span><strong>${activities.length}</strong><small>Según el campo Responsable</small></article>
       <article class="my-work-summary-card"><span>Notas abiertas</span><strong>${notes.length}</strong><small>Notas de Auditoría creadas por ti</small></article>
     `;
@@ -298,12 +299,12 @@ export async function renderMiTrabajo(container, navigationTarget = null) {
       return;
     }
     body.innerHTML = `
-      <div class="my-work-section-heading"><div><p class="eyebrow">Responsabilidad registrada</p><h3>Proyectos</h3></div><strong>${projects.length}</strong></div>
+      <div class="my-work-section-heading"><div><p class="eyebrow">Responsabilidad registrada</p><h3>Proyectos / Actividades generales</h3></div><strong>${projects.length}</strong></div>
       <div class="my-work-card-list compact">
         ${projects.map((project) => {
           const ctx = maps.projectContext(project);
-          return `<article class="my-work-item"><div><p class="eyebrow">${escapeHTML(vcName(ctx.vc))} · ${escapeHTML(ctx.program?.nombre || "Programa")}</p><h3>${escapeHTML(project.codigo || "Proyecto")} · ${escapeHTML(project.nombre)}</h3><p class="muted">${escapeHTML(project.responsable || "")}</p></div><button class="btn btn-secondary open-own-project" data-id="${project.id}" type="button">Abrir proyecto</button></article>`;
-        }).join("") || `<div class="empty-state">Sin Proyectos identificados.</div>`}
+          return `<article class="my-work-item"><div><p class="eyebrow">${project.tipo_unidad === "actividad_general" ? "Actividad general" : "Proyecto"} · ${escapeHTML(vcName(ctx.vc))} · ${escapeHTML(ctx.program?.nombre || "Programa")}</p><h3>${escapeHTML(project.codigo || (project.tipo_unidad === "actividad_general" ? "Actividad" : "Proyecto"))} · ${escapeHTML(project.nombre)}</h3><p class="muted">${escapeHTML(project.responsable || "")}</p></div><button class="btn btn-secondary open-own-project" data-id="${project.id}" type="button">Abrir ${project.tipo_unidad === "actividad_general" ? "actividad" : "proyecto"}</button></article>`;
+        }).join("") || `<div class="empty-state">Sin Proyectos o Actividades generales identificados.</div>`}
       </div>
       <div class="my-work-section-heading"><div><p class="eyebrow">Responsabilidad registrada</p><h3>Actividades</h3></div><strong>${activities.length}</strong></div>
       <div class="my-work-card-list compact">

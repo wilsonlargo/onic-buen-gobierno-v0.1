@@ -1,7 +1,7 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
-import { openModal, closeModal } from "../components/modal.js?v=5.3.1";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.3.1";
-import { uiIcon } from "../components/uiSystem.js?v=5.3.1";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.2";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.2";
+import { uiIcon } from "../components/uiSystem.js?v=5.4.2";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -194,7 +194,7 @@ export async function openForceDeleteVigenciaDialog({
           )}
 
           ${summaryCard(
-            "Proyectos",
+            "Unidades de gestión",
             summary.proyectos
           )}
 
@@ -244,7 +244,7 @@ export async function openForceDeleteVigenciaDialog({
           )}
 
           ${summaryCard(
-            "Vínculos Proyecto–Mandato",
+            "Vínculos Unidad–Mandato",
             summary.proyecto_mandatos
           )}
 

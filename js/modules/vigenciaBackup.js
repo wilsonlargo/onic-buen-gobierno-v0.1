@@ -1,8 +1,8 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
-import { logManualEvent } from "../security.js?v=5.3.1";
-import { openModal, closeModal } from "../components/modal.js?v=5.3.1";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.3.1";
-import { uiIcon } from "../components/uiSystem.js?v=5.3.1";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
+import { logManualEvent } from "../security.js?v=5.4.2";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.2";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.2";
+import { uiIcon } from "../components/uiSystem.js?v=5.4.2";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -52,6 +52,58 @@ function downloadJSON(payload, filename) {
   }, 1000);
 }
 
+async function getUnitTypeMetadata(vigenciaId) {
+  const supabase = requireSupabase();
+  const { data: vcs, error: vcError } = await supabase
+    .from("vigencia_consejerias")
+    .select("id,consejerias(nombre_corto,nombre_largo)")
+    .eq("vigencia_id", vigenciaId);
+  if (vcError) throw vcError;
+  const vcIds = (vcs || []).map((row) => row.id);
+  if (!vcIds.length) return [];
+
+  const { data: lines, error: lineError } = await supabase.from("lineas_accion").select("id,vigencia_consejeria_id,nombre").in("vigencia_consejeria_id", vcIds);
+  if (lineError) throw lineError;
+  const lineIds = (lines || []).map((row) => row.id);
+  if (!lineIds.length) return [];
+
+  const { data: programs, error: programError } = await supabase.from("programas").select("id,linea_accion_id,nombre").in("linea_accion_id", lineIds);
+  if (programError) throw programError;
+  const programIds = (programs || []).map((row) => row.id);
+  if (!programIds.length) return [];
+
+  const { data: projects, error: projectError } = await supabase.from("proyectos").select("id,programa_id,codigo,nombre,tipo_unidad,actividad_principal_id").in("programa_id", programIds);
+  if (projectError) throw projectError;
+  const principalIds = (projects || []).map((row) => row.actividad_principal_id).filter(Boolean);
+  let activities = [];
+  if (principalIds.length) {
+    const { data, error } = await supabase.from("actividades").select("id,codigo,nombre").in("id", principalIds);
+    if (error) throw error;
+    activities = data || [];
+  }
+
+  const vcMap = new Map((vcs || []).map((row) => [row.id, row]));
+  const lineMap = new Map((lines || []).map((row) => [row.id, row]));
+  const programMap = new Map((programs || []).map((row) => [row.id, row]));
+  const activityMap = new Map(activities.map((row) => [row.id, row]));
+
+  return (projects || []).map((project) => {
+    const program = programMap.get(project.programa_id);
+    const line = lineMap.get(program?.linea_accion_id);
+    const vc = vcMap.get(line?.vigencia_consejeria_id);
+    const principal = activityMap.get(project.actividad_principal_id);
+    return {
+      consejeria: vc?.consejerias?.nombre_corto || vc?.consejerias?.nombre_largo || null,
+      linea: line?.nombre || null,
+      programa: program?.nombre || null,
+      codigo: project.codigo || null,
+      nombre: project.nombre,
+      tipo_unidad: project.tipo_unidad || "proyecto",
+      actividad_principal: principal ? { codigo: principal.codigo || null, nombre: principal.nombre } : null
+    };
+  }).filter((row) => row.tipo_unidad === "actividad_general");
+}
+
 async function exportVigencia(vigenciaId) {
   const supabase = requireSupabase();
 
@@ -63,6 +115,10 @@ async function exportVigencia(vigenciaId) {
   );
 
   if (error) throw error;
+  const unitTypes = await getUnitTypeMetadata(vigenciaId);
+  if (unitTypes.length) {
+    data.metadata = { ...(data.metadata || {}), version_aplicacion: "5.4.0", unidad_tipos: unitTypes };
+  }
   return data;
 }
 
@@ -90,7 +146,7 @@ export function openVigenciaBackupDialog({
           <p>
             Se generará un archivo con toda la estructura de esta
             Vigencia: Consejerías, Mandatos, Biblioteca, Líneas,
-            Programas, Proyectos, Actividades, Indicadores,
+            Programas, Proyectos / Actividades generales, Indicadores,
             seguimientos, presupuesto, evidencias, cortes históricos y compromisos.
           </p>
         </div>

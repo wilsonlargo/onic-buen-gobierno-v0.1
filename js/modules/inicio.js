@@ -1,10 +1,10 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
-import { setAuditContext } from "./auditoria.js?v=5.3.1";
-import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.3.1";
-import { loadOfficialTrackingSeries, renderTrackingChart } from "./cortesSeguimiento.js?v=5.3.1";
-import { loadAlertSummary, updateAlertsNavBadge } from "./alertasTareas.js?v=5.3.1";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.3.1";
-import { getCurrentProfile } from "../security.js?v=5.3.1";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
+import { setAuditContext } from "./auditoria.js?v=5.4.2";
+import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.2";
+import { loadOfficialTrackingSeries, renderTrackingChart } from "./cortesSeguimiento.js?v=5.4.2";
+import { loadAlertSummary, updateAlertsNavBadge } from "./alertasTareas.js?v=5.4.2";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.2";
+import { getCurrentProfile } from "../security.js?v=5.4.2";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -302,7 +302,7 @@ async function getDashboardData(vigenciaId) {
     "proyectos",
     "programa_id",
     programIds,
-    "id,programa_id,nombre,estado,ponderacion,orden"
+    "id,programa_id,nombre,estado,ponderacion,orden,tipo_unidad,actividad_principal_id"
   );
 
   const projectIds = proyectos.map((row) => row.id);
@@ -721,23 +721,31 @@ function calculateDashboardMetrics(data) {
       consejeriasActivas:
         activeConsejerias.length,
 
-      lineas: lineas.length,
+      lineas: lineas.filter((item) => item.estado !== "archivada").length,
       lineasActivas:
         lineas.filter(
           (item) => item.estado === "activa"
         ).length,
 
-      programas: programas.length,
+      programas: programas.filter((item) => item.estado !== "archivado").length,
       programasActivos:
         programas.filter(
           (item) => item.estado === "activo"
         ).length,
 
-      proyectos: proyectos.length,
+      proyectos: proyectos.filter((item) => item.tipo_unidad !== "actividad_general").length,
+      actividadesGenerales: proyectos.filter((item) => item.tipo_unidad === "actividad_general").length,
+      unidades: proyectos.length,
       proyectosActivos:
         proyectos.filter(
-          (item) => item.estado === "activo"
-        ).length
+          (item) => item.estado === "activo" && item.tipo_unidad !== "actividad_general"
+        ).length,
+      actividadesGeneralesActivas:
+        proyectos.filter(
+          (item) => item.estado === "activo" && item.tipo_unidad === "actividad_general"
+        ).length,
+      unidadesActivas:
+        proyectos.filter((item) => item.estado === "activo").length
     },
 
     progress:
@@ -809,7 +817,7 @@ function renderProgressPanel(metrics) {
 
         <p>
           Resultado consolidado desde los indicadores de las
-          Actividades y propagado automáticamente por Proyecto,
+          Actividades y propagado automáticamente por unidad de gestión,
           Programa, Línea de Acción y Consejería.
         </p>
 
@@ -992,12 +1000,12 @@ export async function renderInicio(container, navigationTarget = null) {
     ],
     consejeria: [
       ["mi_trabajo", "Mi trabajo", "Ver pendientes asignados"],
-      ["proyectos", "Proyectos", "Actualizar la planeación operativa"],
+      ["proyectos", "Proyectos / Actividades", "Actualizar la planeación operativa"],
       ["alertas", "Alertas y tareas", "Atender compromisos"],
       ["seguimiento_mandatos", "Seguimiento de Mandatos", "Consultar avance asociado"]
     ],
     consulta: [
-      ["proyectos", "Proyectos", "Consultar la planeación"],
+      ["proyectos", "Proyectos / Actividades", "Consultar la planeación"],
       ["seguimiento_mandatos", "Seguimiento de Mandatos", "Consultar avance asociado"],
       ["cortes", "Cortes", "Consultar el histórico"],
       ["calidad", "Control de calidad", "Consultar consistencia estructural"]
@@ -1247,10 +1255,10 @@ export async function renderInicio(container, navigationTarget = null) {
 
         ${metricCard({
           type: "proyectos",
-          label: "Proyectos",
-          value: metrics.counts.proyectos,
+          label: "Unidades de gestión",
+          value: metrics.counts.unidades,
           secondary:
-            `${metrics.counts.proyectosActivos} activos`
+            `${metrics.counts.proyectos} Proyectos · ${metrics.counts.actividadesGenerales} Actividades generales`
         })}
       `;
 

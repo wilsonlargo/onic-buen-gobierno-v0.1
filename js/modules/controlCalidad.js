@@ -1,6 +1,6 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.3.1";
-import { setAuditContext } from "./auditoria.js?v=5.3.1";
-import { uiIcon } from "../components/uiSystem.js?v=5.3.1";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
+import { setAuditContext } from "./auditoria.js?v=5.4.2";
+import { uiIcon } from "../components/uiSystem.js?v=5.4.2";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -76,7 +76,7 @@ async function loadQualityData(vigenciaId, vcId = "") {
     "proyectos",
     "programa_id",
     programaIds,
-    "id,programa_id,codigo,nombre,nombre_corto,descripcion,objetivo_general,responsable,fecha_inicio,fecha_fin,estado,ponderacion,orden"
+    "id,programa_id,codigo,nombre,nombre_corto,descripcion,objetivo_general,responsable,fecha_inicio,fecha_fin,estado,ponderacion,orden,tipo_unidad,actividad_principal_id"
   );
   const projectIds = proyectos.map((row) => row.id);
   const actividades = await getRowsIn(
@@ -147,28 +147,34 @@ function buildQualityRows(data) {
     const vc = vcById.get(line?.vigencia_consejeria_id);
     const activities = (activitiesByProject.get(project.id) || []).filter((activity) => activity.estado !== "cancelada");
     const activeIndicators = activities.flatMap((activity) => (indicatorsByActivity.get(activity.id) || []).filter((indicator) => indicator.estado === "activo"));
+    const isGeneral = project.tipo_unidad === "actividad_general";
 
     const checks = [];
     checks.push({ key: "objetivo", label: "Objetivo general definido", ok: hasText(project.objetivo_general), target: "perfil" });
     checks.push({ key: "responsable", label: "Responsable definido", ok: hasText(project.responsable), target: "perfil" });
     checks.push({
       key: "fechas",
-      label: "Fechas del Proyecto completas y coherentes",
+      label: isGeneral ? "Fechas de la Actividad general completas y coherentes" : "Fechas del Proyecto completas y coherentes",
       ok: Boolean(project.fecha_inicio && project.fecha_fin && project.fecha_inicio <= project.fecha_fin),
       target: "perfil"
     });
-    checks.push({ key: "actividades", label: "Tiene al menos una Actividad", ok: activities.length > 0, target: "actividades" });
+    checks.push({
+      key: "actividades",
+      label: isGeneral ? "Seguimiento directo habilitado" : "Tiene al menos una Actividad",
+      ok: activities.length > 0,
+      target: isGeneral ? "indicadores" : "actividades"
+    });
     checks.push({
       key: "actividad_datos",
-      label: "Actividades con responsable y fechas",
+      label: isGeneral ? "Datos operativos coherentes" : "Actividades con responsable y fechas",
       ok: activities.length > 0 && activities.every((activity) => hasText(activity.responsable) && activity.fecha_inicio && activity.fecha_fin && activity.fecha_inicio <= activity.fecha_fin),
-      target: "actividades"
+      target: isGeneral ? "perfil" : "actividades"
     });
     checks.push({
       key: "actividad_indicadores",
-      label: "Cada Actividad tiene Indicadores activos",
-      ok: activities.length > 0 && activities.every((activity) => (indicatorsByActivity.get(activity.id) || []).some((indicator) => indicator.estado === "activo")),
-      target: "actividades"
+      label: isGeneral ? "Tiene Indicadores activos" : "Cada Actividad tiene Indicadores activos",
+      ok: isGeneral ? activeIndicators.length > 0 : (activities.length > 0 && activities.every((activity) => (indicatorsByActivity.get(activity.id) || []).some((indicator) => indicator.estado === "activo"))),
+      target: isGeneral ? "indicadores" : "actividades"
     });
     checks.push({
       key: "indicadores_validos",
@@ -178,7 +184,7 @@ function buildQualityRows(data) {
         const meta = numericValue(indicator.meta);
         return base !== null && meta !== null && Math.abs(meta - base) > 1e-12 && hasText(indicator.nombre) && hasText(indicator.unidad_medida) && ["ascendente", "descendente"].includes(indicator.sentido);
       }),
-      target: "actividades"
+      target: isGeneral ? "indicadores" : "actividades"
     });
     checks.push({
       key: "ponderacion",
@@ -239,7 +245,7 @@ export async function renderControlCalidad(container, navigationTarget = null) {
       <div>
         <p class="eyebrow" style="color:var(--onic-cream-300)">Revisión de formulación</p>
         <h2>Control de calidad</h2>
-        <p>Verifica que los Proyectos tengan la información mínima necesaria para producir seguimiento y avances confiables.</p>
+        <p>Verifica que los Proyectos y Actividades generales tengan la información mínima necesaria para producir seguimiento y avances confiables.</p>
       </div>
       <div class="quality-hero-note">La revisión es estructural: no reemplaza la valoración técnica o política del contenido.</div>
     </section>
@@ -264,7 +270,7 @@ export async function renderControlCalidad(container, navigationTarget = null) {
           </select>
         </div>
         <div class="form-field">
-          <label for="qualitySearch">Buscar Proyecto</label>
+          <label for="qualitySearch">Buscar unidad</label>
           <input id="qualitySearch" type="search" placeholder="Código, nombre, responsable…">
         </div>
       </div>
@@ -275,7 +281,7 @@ export async function renderControlCalidad(container, navigationTarget = null) {
     <section class="panel quality-guide">
       <details>
         <summary>¿Qué verifica el Control de calidad?</summary>
-        <p>Comprueba objetivo, responsable, fechas, Actividades, Indicadores y ponderación. El porcentaje expresa cuántos requisitos estructurales están completos; no es un porcentaje de avance ni califica la calidad sustantiva del Proyecto.</p>
+        <p>Comprueba objetivo, responsable, fechas, estructura operativa, Indicadores y ponderación. El porcentaje expresa cuántos requisitos estructurales están completos; no es un porcentaje de avance ni califica la calidad sustantiva de la unidad.</p>
       </details>
     </section>
 
@@ -299,7 +305,7 @@ export async function renderControlCalidad(container, navigationTarget = null) {
     const incomplete = rows.filter((row) => row.state.key === "incomplete").length;
     const avg = rows.length ? rows.reduce((sum, row) => sum + row.score, 0) / rows.length : 0;
     summaryHost.innerHTML = `
-      <article class="quality-summary-card"><span>Proyectos revisados</span><strong>${rows.length}</strong><small>Dentro del alcance seleccionado</small></article>
+      <article class="quality-summary-card"><span>Unidades revisadas</span><strong>${rows.length}</strong><small>Dentro del alcance seleccionado</small></article>
       <article class="quality-summary-card quality-complete"><span>Completos</span><strong>${complete}</strong><small>100 % de requisitos estructurales</small></article>
       <article class="quality-summary-card quality-review"><span>Requieren ajustes</span><strong>${review}</strong><small>Entre 75 % y 99,99 %</small></article>
       <article class="quality-summary-card quality-incomplete"><span>Incompletos</span><strong>${incomplete}</strong><small>Menos de 75 %</small></article>
@@ -328,7 +334,7 @@ export async function renderControlCalidad(container, navigationTarget = null) {
   function renderBody() {
     const visible = filteredRows();
     if (!visible.length) {
-      body.innerHTML = `<div class="empty-state">No hay Proyectos que coincidan con los filtros seleccionados.</div>`;
+      body.innerHTML = `<div class="empty-state">No hay unidades que coincidan con los filtros seleccionados.</div>`;
       return;
     }
 
@@ -341,8 +347,8 @@ export async function renderControlCalidad(container, navigationTarget = null) {
           <div class="quality-project-header">
             <div>
               <p class="eyebrow">${escapeHTML(vcName(row.vc))} · ${escapeHTML(row.program?.nombre || "Programa")}</p>
-              <h3>${escapeHTML(row.project.codigo || "Proyecto")} · ${escapeHTML(row.project.nombre)}</h3>
-              <p class="muted">${escapeHTML(row.project.responsable || "Sin responsable")} · ${row.activities.length} Actividad${row.activities.length === 1 ? "" : "es"} · ${row.activeIndicators.length} Indicador${row.activeIndicators.length === 1 ? "" : "es"} activo${row.activeIndicators.length === 1 ? "" : "s"}</p>
+              <h3>${escapeHTML(row.project.codigo || (row.project.tipo_unidad === "actividad_general" ? "Actividad" : "Proyecto"))} · ${escapeHTML(row.project.nombre)}</h3>
+              <p class="muted">${row.project.tipo_unidad === "actividad_general" ? "Actividad general" : "Proyecto"} · ${escapeHTML(row.project.responsable || "Sin responsable")} · ${row.project.tipo_unidad === "actividad_general" ? "seguimiento directo" : `${row.activities.length} Actividad${row.activities.length === 1 ? "" : "es"}`} · ${row.activeIndicators.length} Indicador${row.activeIndicators.length === 1 ? "" : "es"} activo${row.activeIndicators.length === 1 ? "" : "s"}</p>
             </div>
             <div class="quality-score-block">
               <strong>${row.score.toFixed(0)} %</strong>
@@ -361,7 +367,7 @@ export async function renderControlCalidad(container, navigationTarget = null) {
           </div>
           <div class="quality-project-actions">
             <span class="muted">Mandatos relacionados: ${row.mandateCount}</span>
-            <button class="btn btn-secondary quality-open" type="button">Abrir proyecto</button>
+            <button class="btn btn-secondary quality-open" type="button">Abrir unidad</button>
           </div>
         </article>
       `;
