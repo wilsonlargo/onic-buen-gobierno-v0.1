@@ -1,13 +1,13 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.5";
-import { updateWithVersion } from "../security.js?v=5.4.5";
-import { openModal, closeModal } from "../components/modal.js?v=5.4.5";
-import { setAuditContext } from "./auditoria.js?v=5.4.5";
-import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.5";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.7";
+import { updateWithVersion } from "../security.js?v=5.4.7";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.7";
+import { setAuditContext } from "./auditoria.js?v=5.4.7";
+import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.7";
 import {
   formatConsejeriaProgress,
   getConsejeriaProgressState
-} from "./consejeriaProgress.js?v=5.4.5";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.4.5";
+} from "./consejeriaProgress.js?v=5.4.7";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.7";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -871,6 +871,138 @@ function openDocumentForm({
   });
 }
 
+
+function planningStatusChip(estado = "") {
+  const value = String(estado || "").toLowerCase();
+  const active = ["activa", "activo", "en_ejecucion"].includes(value);
+  const closed = ["inactiva", "inactivo", "cerrado", "archivado", "cancelado"].includes(value);
+  const css = active ? "active" : closed ? "closed" : "warning";
+  const labels = {
+    activa: "Activa",
+    activo: "Activo",
+    inactiva: "Inactiva",
+    inactivo: "Inactivo",
+    formulacion: "Formulación",
+    cerrado: "Cerrado",
+    archivado: "Archivado",
+    cancelado: "Cancelado"
+  };
+  return `<span class="status-chip ${css}">${escapeHTML(labels[value] || estado || "Sin estado")}</span>`;
+}
+
+async function getPlanningStructure(vigenciaConsejeriaId) {
+  const supabase = requireSupabase();
+
+  const { data: lineas, error: lineError } = await supabase
+    .from("lineas_accion")
+    .select("id,nombre,nombre_corto,descripcion,orden,estado")
+    .eq("vigencia_consejeria_id", vigenciaConsejeriaId)
+    .order("orden", { ascending: true })
+    .order("nombre", { ascending: true });
+  if (lineError) throw lineError;
+
+  const lineRows = lineas || [];
+  const lineIds = lineRows.map((item) => item.id);
+  let programas = [];
+  if (lineIds.length) {
+    const { data, error } = await supabase
+      .from("programas")
+      .select("id,linea_accion_id,nombre,nombre_corto,descripcion,orden,estado")
+      .in("linea_accion_id", lineIds)
+      .order("orden", { ascending: true })
+      .order("nombre", { ascending: true });
+    if (error) throw error;
+    programas = data || [];
+  }
+
+  const programIds = programas.map((item) => item.id);
+  let proyectos = [];
+  if (programIds.length) {
+    const { data, error } = await supabase
+      .from("proyectos")
+      .select("id,programa_id,codigo,nombre,nombre_corto,descripcion,responsable,fecha_inicio,fecha_fin,estado,orden,tipo_unidad,actividad_principal_id")
+      .in("programa_id", programIds)
+      .order("orden", { ascending: true })
+      .order("nombre", { ascending: true });
+    if (error) throw error;
+    proyectos = data || [];
+  }
+
+  const projectIds = proyectos.map((item) => item.id);
+  let actividades = [];
+  if (projectIds.length) {
+    const { data, error } = await supabase
+      .from("actividades")
+      .select("id,proyecto_id,codigo,nombre,descripcion,responsable,fecha_inicio,fecha_fin,estado,orden")
+      .in("proyecto_id", projectIds)
+      .order("orden", { ascending: true })
+      .order("nombre", { ascending: true });
+    if (error) throw error;
+    actividades = data || [];
+  }
+
+  const activitiesByProject = new Map();
+  actividades.forEach((actividad) => {
+    if (!activitiesByProject.has(actividad.proyecto_id)) activitiesByProject.set(actividad.proyecto_id, []);
+    activitiesByProject.get(actividad.proyecto_id).push(actividad);
+  });
+
+  const projectsByProgram = new Map();
+  proyectos.forEach((proyecto) => {
+    if (!projectsByProgram.has(proyecto.programa_id)) projectsByProgram.set(proyecto.programa_id, []);
+    projectsByProgram.get(proyecto.programa_id).push({
+      ...proyecto,
+      actividades: activitiesByProject.get(proyecto.id) || []
+    });
+  });
+
+  const programsByLine = new Map();
+  programas.forEach((programa) => {
+    if (!programsByLine.has(programa.linea_accion_id)) programsByLine.set(programa.linea_accion_id, []);
+    programsByLine.get(programa.linea_accion_id).push({
+      ...programa,
+      unidades: projectsByProgram.get(programa.id) || []
+    });
+  });
+
+  return {
+    lineas: lineRows.map((linea) => ({
+      ...linea,
+      programas: programsByLine.get(linea.id) || []
+    }))
+  };
+}
+
+function structureTotals(structure) {
+  const totals = {
+    lineas: 0,
+    programas: 0,
+    proyectos: 0,
+    actividadesGenerales: 0,
+    actividades: 0,
+    activas: 0,
+    cerradas: 0
+  };
+
+  (structure?.lineas || []).forEach((linea) => {
+    totals.lineas += 1;
+    (linea.programas || []).forEach((programa) => {
+      totals.programas += 1;
+      (programa.unidades || []).forEach((unidad) => {
+        if (unidad.tipo_unidad === "actividad_general") totals.actividadesGenerales += 1;
+        else totals.proyectos += 1;
+        if (["activo", "activa"].includes(unidad.estado)) totals.activas += 1;
+        if (["cerrado", "inactivo", "inactiva", "cancelado"].includes(unidad.estado)) totals.cerradas += 1;
+        if (unidad.tipo_unidad !== "actividad_general") {
+          totals.actividades += (unidad.actividades || []).length;
+        }
+      });
+    });
+  });
+
+  return totals;
+}
+
 /* ==========================================================
    WORKSPACE
    ========================================================== */
@@ -882,7 +1014,7 @@ export async function renderConsejeriaWorkspace(
     record,
     onBack,
     onChanged,
-    initialTab = "perfil",
+    initialTab = "resumen",
     progressMetric = null
   }
 ) {
@@ -892,6 +1024,7 @@ export async function renderConsejeriaWorkspace(
   let allMandates = [];
   let assignedMandateIds = [];
   let documents = [];
+  let planningStructure = { lineas: [] };
 
   let mandateSearch = "";
   let mandateFilter = "todos";
@@ -903,11 +1036,13 @@ export async function renderConsejeriaWorkspace(
     [
       allMandates,
       assignedMandateIds,
-      documents
+      documents,
+      planningStructure
     ] = await Promise.all([
       getMandatosVigencia(vigencia.id),
       getAssignedMandateIds(currentRecord.id),
-      getDocuments(currentRecord.id)
+      getDocuments(currentRecord.id),
+      getPlanningStructure(currentRecord.id)
     ]);
   }
 
@@ -1084,34 +1219,26 @@ export async function renderConsejeriaWorkspace(
   }
 
   function tabsHTML() {
+    const totals = structureTotals(planningStructure);
     return `
       <nav class="consejeria-workspace-tabs">
-        <button
-          type="button"
-          data-consejeria-tab="perfil"
-          class="${activeTab === "perfil" ? "active" : ""}"
-        >
-          Perfil
+        <button type="button" data-consejeria-tab="resumen" class="${activeTab === "resumen" ? "active" : ""}">
+          Resumen
         </button>
-
-        <button
-          type="button"
-          data-consejeria-tab="mandatos"
-          class="${activeTab === "mandatos" ? "active" : ""}"
-        >
+        <button type="button" data-consejeria-tab="estructura" class="${activeTab === "estructura" ? "active" : ""}">
+          Estructura
+          <span>${totals.lineas}</span>
+        </button>
+        <button type="button" data-consejeria-tab="perfil" class="${activeTab === "perfil" ? "active" : ""}">
+          Perfil de vigencia
+        </button>
+        <button type="button" data-consejeria-tab="mandatos" class="${activeTab === "mandatos" ? "active" : ""}">
           Mandatos
           <span>${assignedMandateIds.length}</span>
         </button>
-
-        <button
-          type="button"
-          data-consejeria-tab="biblioteca"
-          class="${activeTab === "biblioteca" ? "active" : ""}"
-        >
+        <button type="button" data-consejeria-tab="biblioteca" class="${activeTab === "biblioteca" ? "active" : ""}">
           Biblioteca
-          <span>
-            ${documents.filter((item) => item.estado === "activo").length}
-          </span>
+          <span>${documents.filter((item) => item.estado === "activo").length}</span>
         </button>
       </nav>
     `;
@@ -1189,6 +1316,216 @@ export async function renderConsejeriaWorkspace(
       });
 
     renderCurrentTab();
+  }
+
+  function renderSummary() {
+    const body = container.querySelector("#consejeriaWorkspaceBody");
+    const totals = structureTotals(planningStructure);
+    const lineCards = (planningStructure.lineas || []).map((linea) => {
+      const programs = linea.programas || [];
+      const units = programs.flatMap((programa) => programa.unidades || []);
+      const projects = units.filter((unit) => unit.tipo_unidad !== "actividad_general").length;
+      const generalActivities = units.filter((unit) => unit.tipo_unidad === "actividad_general").length;
+      const activities = units.reduce(
+        (sum, unit) => sum + (unit.tipo_unidad === "actividad_general" ? 0 : (unit.actividades || []).length),
+        0
+      );
+      return `
+        <article class="consejeria-line-summary-card">
+          <div class="consejeria-line-summary-head">
+            <div>
+              <p class="eyebrow">${escapeHTML(linea.nombre_corto || "Línea de acción")}</p>
+              <h4>${escapeHTML(linea.nombre)}</h4>
+            </div>
+            ${planningStatusChip(linea.estado)}
+          </div>
+          <div class="consejeria-line-summary-metrics">
+            <span><strong>${programs.length}</strong> Programas</span>
+            <span><strong>${projects}</strong> Proyectos</span>
+            <span><strong>${generalActivities + activities}</strong> Actividades</span>
+          </div>
+        </article>
+      `;
+    }).join("");
+
+    body.innerHTML = `
+      <section class="workspace-section consejeria-summary-section">
+        <div class="workspace-section-heading">
+          <div>
+            <p class="eyebrow">Resumen de gestión</p>
+            <h3>Estructura de planeación de la Consejería</h3>
+          </div>
+          <button id="openConsejeriaStructure" class="btn btn-secondary" type="button">Ver estructura completa</button>
+        </div>
+
+        <div class="tracking-summary-grid consejeria-structure-summary-grid">
+          <article class="tracking-summary-card primary"><span>Líneas de acción</span><strong>${totals.lineas}</strong><small>Estructura estratégica</small></article>
+          <article class="tracking-summary-card"><span>Programas</span><strong>${totals.programas}</strong><small>Programas vinculados</small></article>
+          <article class="tracking-summary-card"><span>Proyectos</span><strong>${totals.proyectos}</strong><small>Unidades tipo proyecto</small></article>
+          <article class="tracking-summary-card"><span>Actividades</span><strong>${totals.actividadesGenerales + totals.actividades}</strong><small>${totals.actividadesGenerales} generales · ${totals.actividades} internas</small></article>
+        </div>
+      </section>
+
+      <section class="workspace-section">
+        <div class="workspace-section-heading">
+          <div>
+            <p class="eyebrow">Lectura rápida</p>
+            <h3>Líneas de acción</h3>
+          </div>
+          <p class="muted">Una vista resumida de cómo se distribuyen programas, proyectos y actividades.</p>
+        </div>
+        ${lineCards ? `<div class="consejeria-line-summary-grid">${lineCards}</div>` : `
+          <div class="empty-state workspace-empty">
+            <strong>Esta Consejería todavía no tiene estructura de planeación.</strong>
+            <p>Las Líneas, Programas y Proyectos aparecerán aquí automáticamente cuando sean registrados.</p>
+          </div>
+        `}
+      </section>
+    `;
+
+    body.querySelector("#openConsejeriaStructure")?.addEventListener("click", () => {
+      activeTab = "estructura";
+      renderCurrentTab();
+    });
+  }
+
+  function renderStructure() {
+    const body = container.querySelector("#consejeriaWorkspaceBody");
+    const lines = planningStructure.lineas || [];
+
+    if (!lines.length) {
+      body.innerHTML = `
+        <section class="workspace-section">
+          <div class="empty-state workspace-empty">
+            <strong>No hay Líneas de Acción registradas para esta Consejería.</strong>
+            <p>La estructura se construye desde los módulos de Líneas, Programas y Proyectos / Actividades.</p>
+          </div>
+        </section>
+      `;
+      return;
+    }
+
+    body.innerHTML = `
+      <section class="workspace-section workspace-section-flush consejeria-structure-section">
+        <div class="workspace-section-heading consejeria-structure-heading">
+          <div>
+            <p class="eyebrow">Estructura completa</p>
+            <h3>Líneas → Programas → Proyectos / Actividades</h3>
+          </div>
+          <p class="muted">Despliega cada nivel y abre el registro original cuando necesites trabajar sobre él.</p>
+        </div>
+
+        <div class="consejeria-structure-tree">
+          ${lines.map((linea, lineIndex) => `
+            <details class="structure-line" ${lineIndex === 0 ? "open" : ""}>
+              <summary>
+                <div class="structure-node-main">
+                  <span class="structure-level-label">Línea</span>
+                  <div>
+                    <strong>${escapeHTML(linea.nombre)}</strong>
+                    <small>${escapeHTML(linea.nombre_corto || "")}</small>
+                  </div>
+                </div>
+                <div class="structure-node-meta">
+                  <span>${(linea.programas || []).length} programa${(linea.programas || []).length === 1 ? "" : "s"}</span>
+                  ${planningStatusChip(linea.estado)}
+                  <button class="btn btn-secondary btn-sm structure-open-line" type="button" data-linea-id="${linea.id}" title="Abrir Línea de Acción">Abrir</button>
+                </div>
+              </summary>
+              <div class="structure-children">
+                ${(linea.programas || []).length ? (linea.programas || []).map((programa) => {
+                  const units = programa.unidades || [];
+                  return `
+                    <details class="structure-program">
+                      <summary>
+                        <div class="structure-node-main">
+                          <span class="structure-level-label">Programa</span>
+                          <div>
+                            <strong>${escapeHTML(programa.nombre)}</strong>
+                            <small>${escapeHTML(programa.nombre_corto || "")}</small>
+                          </div>
+                        </div>
+                        <div class="structure-node-meta">
+                          <span>${units.length} unidad${units.length === 1 ? "" : "es"}</span>
+                          ${planningStatusChip(programa.estado)}
+                          <button class="btn btn-secondary btn-sm structure-open-program" type="button" data-linea-id="${linea.id}" data-programa-id="${programa.id}" title="Abrir Programa">Abrir</button>
+                        </div>
+                      </summary>
+                      <div class="structure-children structure-units">
+                        ${units.length ? units.map((unidad) => {
+                          const isGeneral = unidad.tipo_unidad === "actividad_general";
+                          const activities = unidad.actividades || [];
+                          return `
+                            <article class="structure-unit ${isGeneral ? "is-general-activity" : ""}">
+                              <div class="structure-unit-head">
+                                <div class="structure-node-main">
+                                  <span class="structure-level-label">${isGeneral ? "Actividad general" : "Proyecto"}</span>
+                                  <div>
+                                    <strong>${escapeHTML(unidad.nombre)}</strong>
+                                    <small>${escapeHTML(unidad.codigo || unidad.nombre_corto || "")}</small>
+                                  </div>
+                                </div>
+                                <div class="structure-node-meta">
+                                  ${!isGeneral ? `<span>${activities.length} actividad${activities.length === 1 ? "" : "es"}</span>` : ""}
+                                  ${planningStatusChip(unidad.estado)}
+                                  <button class="btn btn-secondary btn-sm structure-open-unit" type="button" data-linea-id="${linea.id}" data-programa-id="${programa.id}" data-proyecto-id="${unidad.id}" data-actividad-id="${isGeneral ? escapeHTML(unidad.actividad_principal_id || "") : ""}">Abrir</button>
+                                </div>
+                              </div>
+                              ${!isGeneral && activities.length ? `
+                                <div class="structure-activity-list">
+                                  ${activities.map((actividad) => `
+                                    <div class="structure-activity-row">
+                                      <div>
+                                        <span class="structure-level-label">Actividad</span>
+                                        <strong>${escapeHTML(actividad.nombre)}</strong>
+                                        ${actividad.codigo ? `<small>${escapeHTML(actividad.codigo)}</small>` : ""}
+                                      </div>
+                                      <div class="structure-node-meta">
+                                        ${planningStatusChip(actividad.estado)}
+                                        <button class="btn btn-secondary btn-sm structure-open-activity" type="button" data-linea-id="${linea.id}" data-programa-id="${programa.id}" data-proyecto-id="${unidad.id}" data-actividad-id="${actividad.id}">Abrir</button>
+                                      </div>
+                                    </div>
+                                  `).join("")}
+                                </div>
+                              ` : ""}
+                            </article>
+                          `;
+                        }).join("") : `<div class="structure-empty">Sin proyectos o actividades registrados.</div>`}
+                      </div>
+                    </details>
+                  `;
+                }).join("") : `<div class="structure-empty">Esta Línea aún no tiene Programas.</div>`}
+              </div>
+            </details>
+          `).join("")}
+        </div>
+      </section>
+    `;
+
+    body.querySelectorAll(".structure-open-line, .structure-open-program, .structure-open-unit, .structure-open-activity").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const target = {
+          vigencia_id: vigencia.id,
+          vigencia_consejeria_id: currentRecord.id
+        };
+
+        if (button.dataset.lineaId) target.linea_id = button.dataset.lineaId;
+        if (button.dataset.programaId) target.programa_id = button.dataset.programaId;
+        if (button.dataset.proyectoId) target.proyecto_id = button.dataset.proyectoId;
+        if (button.dataset.actividadId) target.actividad_id = button.dataset.actividadId;
+
+        const view = button.classList.contains("structure-open-line")
+          ? "lineas"
+          : button.classList.contains("structure-open-program")
+            ? "programas"
+            : "proyectos";
+
+        window.dispatchEvent(new CustomEvent("app:navigate", { detail: { view, target } }));
+      });
+    });
   }
 
   function renderProfile() {
@@ -2344,7 +2681,9 @@ export async function renderConsejeriaWorkspace(
   function syncAuditContext() {
     const c = currentRecord.consejerias || {};
     const labels = {
-      perfil: "Perfil",
+      resumen: "Resumen",
+      estructura: "Estructura",
+      perfil: "Perfil de vigencia",
       mandatos: "Mandatos",
       biblioteca: "Biblioteca"
     };
@@ -2366,7 +2705,9 @@ export async function renderConsejeriaWorkspace(
         consejeria_tab: activeTab
       },
       sectionOptions: [
-        { value: "perfil", label: "Perfil", navigation: { consejeria_tab: "perfil" } },
+        { value: "resumen", label: "Resumen", navigation: { consejeria_tab: "resumen" } },
+        { value: "estructura", label: "Estructura", navigation: { consejeria_tab: "estructura" } },
+        { value: "perfil", label: "Perfil de vigencia", navigation: { consejeria_tab: "perfil" } },
         { value: "mandatos", label: "Mandatos", navigation: { consejeria_tab: "mandatos" } },
         { value: "biblioteca", label: "Biblioteca", navigation: { consejeria_tab: "biblioteca" } }
       ]
@@ -2387,11 +2728,13 @@ export async function renderConsejeriaWorkspace(
         );
       });
 
-    if (activeTab === "mandatos") {
+    if (activeTab === "resumen") {
+      renderSummary();
+    } else if (activeTab === "estructura") {
+      renderStructure();
+    } else if (activeTab === "mandatos") {
       renderMandates();
-    } else if (
-      activeTab === "biblioteca"
-    ) {
+    } else if (activeTab === "biblioteca") {
       renderLibrary();
     } else {
       renderProfile();

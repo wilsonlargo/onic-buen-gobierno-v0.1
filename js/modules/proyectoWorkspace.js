@@ -1,10 +1,10 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.5";
-import { updateWithVersion, logManualEvent } from "../security.js?v=5.4.5";
-import { openModal, closeModal } from "../components/modal.js?v=5.4.5";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.5";
-import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.5";
-import { renderProjectPlanner, plannerColorOptions, exportProjectPlanner } from "./projectPlanner.js?v=5.4.5";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.4.5";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.7";
+import { updateWithVersion, logManualEvent } from "../security.js?v=5.4.7";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.7";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.7";
+import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.7";
+import { renderProjectPlanner, plannerColorOptions, exportProjectPlanner } from "./projectPlanner.js?v=5.4.7";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.7";
 
 function escapeHTML(value = "") {
   return String(value ?? "")

@@ -1,4 +1,4 @@
-import { requireSupabase } from "./supabaseClient.js?v=5.4.5";
+import { requireSupabase } from "./supabaseClient.js?v=5.4.7";
 
 let currentProfile = null;
 let currentAssignments = [];
@@ -273,6 +273,7 @@ function applyConsejeriaRestrictions(viewName, root) {
     hideAll(root, [
       "#newConsejeriaButton",
       "#linkConsejeriaButton",
+      "#addConsejeriaToVigencia",
       ".edit-catalog",
       ".delete-catalog",
       ".retire-consejeria",
@@ -309,9 +310,10 @@ function applyCoordinatorRestrictions(viewName, root) {
 
 export function applyNavigationPermissions(navRoot = document) {
   const userNav = navRoot.querySelector('.nav-item[data-view="usuarios"]');
+  const configNav = navRoot.querySelector('.nav-item[data-view="configuracion"]');
   const historyNav = navRoot.querySelector('.nav-item[data-view="historial"]');
 
-  if (canManageUsers()) showElement(userNav); else hideElement(userNav);
+  if (canManageUsers()) { showElement(userNav); showElement(configNav); } else { hideElement(userNav); hideElement(configNav); }
   if (canViewHistory()) showElement(historyNav); else hideElement(historyNav);
 }
 

@@ -1,7 +1,7 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.5";
-import { updateWithVersion } from "../security.js?v=5.4.5";
-import { openModal, closeModal } from "../components/modal.js?v=5.4.5";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.4.5";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.7";
+import { updateWithVersion } from "../security.js?v=5.4.7";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.7";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.7";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -1606,7 +1606,6 @@ export async function renderProgramas(container, navigationTarget = null) {
     ) {
       selectedLineaId = navigationTarget.linea_id;
       lineaSelector.value = selectedLineaId;
-      navigationTarget = null;
       await refreshProgramas();
       return;
     }
@@ -1718,7 +1717,7 @@ export async function renderProgramas(container, navigationTarget = null) {
             programa.estado === "activo";
 
           return `
-            <article class="programa-card ${!isActive ? "is-inactive" : ""} ${programa.estado === "archivado" ? "historical-record" : ""}">
+            <article id="programa-${programa.id}" class="programa-card ${!isActive ? "is-inactive" : ""} ${programa.estado === "archivado" ? "historical-record" : ""}">
               <div class="programa-card-header">
                 <div>
                   <p class="eyebrow">
@@ -1866,6 +1865,20 @@ export async function renderProgramas(container, navigationTarget = null) {
           });
         });
       });
+
+    if (navigationTarget?.programa_id) {
+      const targetProgram = content.querySelector(
+        `#programa-${CSS.escape(navigationTarget.programa_id)}`
+      );
+
+      if (targetProgram) {
+        targetProgram.scrollIntoView({ behavior: "smooth", block: "center" });
+        targetProgram.classList.add("audit-reference-highlight");
+        setTimeout(() => targetProgram.classList.remove("audit-reference-highlight"), 2600);
+      }
+
+      navigationTarget = null;
+    }
   }
 
   vigenciaSelector.addEventListener(

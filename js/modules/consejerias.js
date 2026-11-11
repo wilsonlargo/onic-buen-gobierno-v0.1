@@ -1,13 +1,13 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.5";
-import { updateWithVersion } from "../security.js?v=5.4.5";
-import { openModal, closeModal } from "../components/modal.js?v=5.4.5";
-import { renderConsejeriaWorkspace } from "./consejeriaWorkspace.js?v=5.4.5";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.7";
+import { updateWithVersion } from "../security.js?v=5.4.7";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.7";
+import { renderConsejeriaWorkspace } from "./consejeriaWorkspace.js?v=5.4.7";
 import {
   getConsejeriaProgressMap,
   formatConsejeriaProgress,
   getConsejeriaProgressState
-} from "./consejeriaProgress.js?v=5.4.5";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.4.5";
+} from "./consejeriaProgress.js?v=5.4.7";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.7";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -540,11 +540,11 @@ function openLinkForm({ vigencia, catalogo, vinculadas, onSaved }) {
 
   if (!disponibles.length) {
     openModal({
-      title: "Vincular consejería",
+      title: "Agregar Consejería a esta vigencia",
       content: `
         <div class="empty-state">
           <strong>No hay consejerías disponibles para vincular.</strong>
-          <p>Crea una nueva consejería en el catálogo o revisa las que ya están vinculadas a esta vigencia.</p>
+          <p>Revisa las Consejerías institucionales en <strong>Configuración</strong> o las que ya están vinculadas a esta vigencia.</p>
           <button id="closeNoAvailable" class="btn btn-secondary" type="button">Cerrar</button>
         </div>
       `
@@ -554,7 +554,7 @@ function openLinkForm({ vigencia, catalogo, vinculadas, onSaved }) {
   }
 
   openModal({
-    title: "Vincular consejería a la vigencia",
+    title: "Agregar Consejería a esta vigencia",
     content: `
       <p class="notice">
         Vigencia: <strong>${escapeHTML(vigencia.nombre)}</strong>.
@@ -625,7 +625,7 @@ function openLinkForm({ vigencia, catalogo, vinculadas, onSaved }) {
 
         <div class="form-actions">
           <button id="cancelLink" class="btn btn-secondary" type="button">Cancelar</button>
-          <button class="btn btn-primary" type="submit">Vincular</button>
+          <button class="btn btn-primary" type="submit">Agregar a la vigencia</button>
         </div>
       </form>
     `
@@ -659,7 +659,7 @@ function openLinkForm({ vigencia, catalogo, vinculadas, onSaved }) {
 
     const submit = form.querySelector('button[type="submit"]');
     submit.disabled = true;
-    submit.textContent = "Vinculando…";
+    submit.textContent = "Agregando…";
 
     try {
       await linkConsejeria(payload);
@@ -667,10 +667,10 @@ function openLinkForm({ vigencia, catalogo, vinculadas, onSaved }) {
       await onSaved();
     } catch (error) {
       console.error(error);
-      message.textContent = friendlyErrorMessage(error, "No fue posible vincular la consejería.");
+      message.textContent = friendlyErrorMessage(error, "No fue posible agregar la Consejería a esta vigencia.");
     } finally {
       submit.disabled = false;
-      submit.textContent = "Vincular";
+      submit.textContent = "Agregar a la vigencia";
     }
   });
 }
@@ -680,7 +680,7 @@ function openEditLinkForm({ record, onSaved }) {
   const fallback = initials(record.responsable || c?.nombre_corto || "ON");
 
   openModal({
-    title: "Consejería en la vigencia",
+    title: "Editar datos de la vigencia",
     content: `
       <p class="notice">
         <strong>${escapeHTML(c?.nombre_corto || "Consejería")}</strong><br>
@@ -879,92 +879,438 @@ function openRetireDialog({ record, onSaved }) {
   });
 }
 
+
+async function getConsejeriaStructureSummaryMap(vigenciaId) {
+  const vinculadas = await getVigenciaConsejerias(vigenciaId);
+  const vcIds = vinculadas.map((item) => item.id);
+  const summary = new Map(
+    vcIds.map((id) => [id, { lineas: 0, programas: 0, proyectos: 0, actividadesGenerales: 0, actividades: 0 }])
+  );
+
+  if (!vcIds.length) return summary;
+
+  const supabase = requireSupabase();
+  const { data: lineas, error: lineError } = await supabase
+    .from("lineas_accion")
+    .select("id,vigencia_consejeria_id")
+    .in("vigencia_consejeria_id", vcIds);
+  if (lineError) throw lineError;
+
+  const lineRows = lineas || [];
+  lineRows.forEach((linea) => {
+    const item = summary.get(linea.vigencia_consejeria_id);
+    if (item) item.lineas += 1;
+  });
+
+  const lineToVc = new Map(lineRows.map((item) => [item.id, item.vigencia_consejeria_id]));
+  const lineIds = lineRows.map((item) => item.id);
+  if (!lineIds.length) return summary;
+
+  const { data: programas, error: programError } = await supabase
+    .from("programas")
+    .select("id,linea_accion_id")
+    .in("linea_accion_id", lineIds);
+  if (programError) throw programError;
+
+  const programRows = programas || [];
+  const programToVc = new Map();
+  programRows.forEach((programa) => {
+    const vcId = lineToVc.get(programa.linea_accion_id);
+    if (!vcId) return;
+    programToVc.set(programa.id, vcId);
+    const item = summary.get(vcId);
+    if (item) item.programas += 1;
+  });
+
+  const programIds = programRows.map((item) => item.id);
+  if (!programIds.length) return summary;
+
+  const { data: proyectos, error: projectError } = await supabase
+    .from("proyectos")
+    .select("id,programa_id,tipo_unidad")
+    .in("programa_id", programIds);
+  if (projectError) throw projectError;
+
+  const projectRows = proyectos || [];
+  const projectToVc = new Map();
+  const projectType = new Map();
+  projectRows.forEach((proyecto) => {
+    const vcId = programToVc.get(proyecto.programa_id);
+    if (!vcId) return;
+    projectToVc.set(proyecto.id, vcId);
+    projectType.set(proyecto.id, proyecto.tipo_unidad);
+    const item = summary.get(vcId);
+    if (!item) return;
+    if (proyecto.tipo_unidad === "actividad_general") item.actividadesGenerales += 1;
+    else item.proyectos += 1;
+  });
+
+  const projectIds = projectRows.map((item) => item.id);
+  if (!projectIds.length) return summary;
+
+  const { data: actividades, error: activityError } = await supabase
+    .from("actividades")
+    .select("id,proyecto_id")
+    .in("proyecto_id", projectIds);
+  if (activityError) throw activityError;
+
+  (actividades || []).forEach((actividad) => {
+    if (projectType.get(actividad.proyecto_id) === "actividad_general") return;
+    const vcId = projectToVc.get(actividad.proyecto_id);
+    const item = summary.get(vcId);
+    if (item) item.actividades += 1;
+  });
+
+  return summary;
+}
+
 export async function renderConsejerias(container, navigationTarget = null) {
   let vigencias = [];
-  let catalogo = [];
   let selectedVigenciaId = "";
+  let vinculadas = [];
   let progressMetrics = new Map();
+  let structureSummary = new Map();
 
   container.innerHTML = `
-    <div class="page-actions">
+    <div class="page-actions consejerias-operational-heading">
       <div>
-        <p class="eyebrow">Estructura institucional</p>
+        <p class="eyebrow">Gestión por vigencia</p>
         <h2>Consejerías</h2>
+        <p class="muted">Consulta la estructura, responsables y avance de cada Consejería en la vigencia seleccionada.</p>
       </div>
-      <button id="newConsejeriaButton" class="btn btn-secondary" type="button">+ Nueva consejería</button>
+      <div class="consejerias-operational-actions">
+        <div class="inline-control consejerias-vigencia-control">
+          <label class="sr-only" for="vigenciaSelector">Vigencia</label>
+          <select id="vigenciaSelector" aria-label="Seleccionar vigencia"></select>
+        </div>
+        <button id="addConsejeriaToVigencia" class="btn btn-primary" type="button">+ Agregar Consejería a esta vigencia</button>
+      </div>
     </div>
 
-    <section class="panel" style="margin-top: 0">
+    <section id="consejeriasVigenciaSummary" class="tracking-summary-grid consejerias-summary-grid" aria-live="polite"></section>
+
+    <section class="panel consejerias-operational-panel" style="margin-top: 0">
       <div class="panel-header">
         <div>
-          <p class="eyebrow">Vigencia de trabajo</p>
-          <h2>Consejerías vinculadas</h2>
+          <p class="eyebrow">Estructura de la vigencia</p>
+          <h2 id="linkedConsejeriasTitle">Consejerías vinculadas</h2>
         </div>
-
-        <div class="inline-control">
-          <select id="vigenciaSelector" aria-label="Seleccionar vigencia"></select>
-          <button id="linkConsejeriaButton" class="btn btn-primary" type="button">+ Vincular</button>
-        </div>
+        <span id="linkedConsejeriasCount" class="status-chip">0</span>
       </div>
-
       <div id="linkedConsejerias" style="margin-top: 18px">
         <div class="empty-state">Cargando…</div>
       </div>
     </section>
+  `;
 
-    <section class="panel">
+  const listView = document.createElement("div");
+  listView.id = "consejeriasListView";
+  while (container.firstChild) listView.appendChild(container.firstChild);
+  container.appendChild(listView);
+
+  const selector = listView.querySelector("#vigenciaSelector");
+  const linkedContainer = listView.querySelector("#linkedConsejerias");
+  const summaryContainer = listView.querySelector("#consejeriasVigenciaSummary");
+  const countChip = listView.querySelector("#linkedConsejeriasCount");
+  const title = listView.querySelector("#linkedConsejeriasTitle");
+  const addConsejeriaButton = listView.querySelector("#addConsejeriaToVigencia");
+
+  function summaryTotals() {
+    return vinculadas.reduce((acc, item) => {
+      const metric = structureSummary.get(item.id) || {};
+      acc.lineas += Number(metric.lineas || 0);
+      acc.programas += Number(metric.programas || 0);
+      acc.proyectos += Number(metric.proyectos || 0);
+      acc.actividadesGenerales += Number(metric.actividadesGenerales || 0);
+      acc.actividades += Number(metric.actividades || 0);
+      return acc;
+    }, { lineas: 0, programas: 0, proyectos: 0, actividadesGenerales: 0, actividades: 0 });
+  }
+
+  function renderVigenciaSummary() {
+    const totals = summaryTotals();
+    const active = vinculadas.filter((item) => item.estado === "activa").length;
+    summaryContainer.innerHTML = `
+      <article class="tracking-summary-card primary">
+        <span>Consejerías</span>
+        <strong>${vinculadas.length}</strong>
+        <small>${active} activa${active === 1 ? "" : "s"} en la vigencia</small>
+      </article>
+      <article class="tracking-summary-card">
+        <span>Líneas de acción</span>
+        <strong>${totals.lineas}</strong>
+        <small>Estructura vinculada</small>
+      </article>
+      <article class="tracking-summary-card">
+        <span>Programas</span>
+        <strong>${totals.programas}</strong>
+        <small>Programas registrados</small>
+      </article>
+      <article class="tracking-summary-card">
+        <span>Proyectos / Actividades</span>
+        <strong>${totals.proyectos + totals.actividadesGenerales}</strong>
+        <small>${totals.proyectos} proyectos · ${totals.actividadesGenerales} actividades generales · ${totals.actividades} actividades internas</small>
+      </article>
+    `;
+  }
+
+  async function openWorkspace(record, { initialTab = "resumen" } = {}) {
+    const vigencia = vigencias.find((item) => item.id === selectedVigenciaId);
+    if (!record || !vigencia) return;
+
+    listView.classList.add("hidden");
+    container.querySelector("#activeConsejeriaWorkspace")?.remove();
+    const workspaceHost = document.createElement("div");
+    workspaceHost.id = "activeConsejeriaWorkspace";
+    container.appendChild(workspaceHost);
+
+    await renderConsejeriaWorkspace(workspaceHost, {
+      vigencia,
+      record,
+      initialTab,
+      progressMetric: progressMetrics.get(record.id) || null,
+      onChanged: async () => {
+        await renderLinked();
+      },
+      onBack: async () => {
+        workspaceHost.remove();
+        listView.classList.remove("hidden");
+        await renderLinked();
+      }
+    });
+  }
+
+  async function renderLinked() {
+    if (!selectedVigenciaId) {
+      linkedContainer.innerHTML = `<div class="empty-state"><strong>No hay una vigencia disponible.</strong></div>`;
+      summaryContainer.innerHTML = "";
+      countChip.textContent = "0";
+      return;
+    }
+
+    linkedContainer.innerHTML = `<div class="empty-state">Cargando Consejerías y estructura…</div>`;
+
+    try {
+      [vinculadas, progressMetrics, structureSummary] = await Promise.all([
+        getVigenciaConsejerias(selectedVigenciaId),
+        getConsejeriaProgressMap(selectedVigenciaId),
+        getConsejeriaStructureSummaryMap(selectedVigenciaId)
+      ]);
+
+      const vigencia = vigencias.find((item) => item.id === selectedVigenciaId);
+      title.textContent = vigencia ? `Consejerías · ${vigencia.nombre}` : "Consejerías vinculadas";
+      countChip.textContent = String(vinculadas.length);
+      renderVigenciaSummary();
+
+      if (!vinculadas.length) {
+        linkedContainer.innerHTML = `
+          <div class="empty-state">
+            <strong>Esta vigencia aún no tiene Consejerías vinculadas.</strong>
+            <p>Usa <strong>+ Agregar Consejería a esta vigencia</strong> para incorporar una Consejería institucional a este periodo.</p>
+          </div>
+        `;
+        return;
+      }
+
+      linkedContainer.innerHTML = `
+        <div class="vigencia-consejerias-grid operational">
+          ${vinculadas.map((item) => {
+            const c = item.consejerias || {};
+            const fallback = initials(item.responsable || c.nombre_corto || "ON");
+            const metric = progressMetrics.get(item.id) || { progress: 0, coverage: 0, active: item.estado === "activa" };
+            const progressState = getConsejeriaProgressState(metric);
+            const hasMeasurement = metric.active !== false && Number(metric.coverage || 0) > 0;
+            const structure = structureSummary.get(item.id) || { lineas: 0, programas: 0, proyectos: 0, actividadesGenerales: 0, actividades: 0 };
+            return `
+              <article class="vigencia-consejeria-card operational ${item.estado === "inactiva" ? "is-inactive" : ""}">
+                <div class="vc-card-header">
+                  <div class="consejero-photo-wrap">
+                    ${mediaPreviewHTML({ url: item.foto_url, kind: "photo", fallback, alt: item.responsable || "Consejero/a" })}
+                  </div>
+                  <div class="vc-card-title">
+                    <div class="vc-title-line">
+                      <div class="entity-icon-wrap small">
+                        ${mediaPreviewHTML({ url: c.icono_url, kind: "icon", fallback: initials(c.nombre_corto), alt: `Ícono de ${c.nombre_corto || "Consejería"}` })}
+                      </div>
+                      <div>
+                        <p class="eyebrow">Consejería</p>
+                        <h3>${escapeHTML(c.nombre_corto || c.nombre_largo || "Consejería")}</h3>
+                        ${c.nombre_largo && c.nombre_largo !== c.nombre_corto ? `<p class="vc-card-long-name">${escapeHTML(c.nombre_largo)}</p>` : ""}
+                      </div>
+                    </div>
+                  </div>
+                  ${statusChip(item.estado)}
+                </div>
+
+                <div class="vc-card-body">
+                  <div class="vc-operational-person">
+                    <div class="vc-data"><span>Responsable</span><strong>${escapeHTML(item.responsable || "Sin registrar")}</strong></div>
+                    <div class="vc-data"><span>Pueblo</span><strong>${escapeHTML(item.pueblo || "Sin registrar")}</strong></div>
+                  </div>
+
+                  <div class="vc-structure-strip" aria-label="Estructura de planeación">
+                    <div><strong>${structure.lineas}</strong><span>Líneas</span></div>
+                    <div><strong>${structure.programas}</strong><span>Programas</span></div>
+                    <div><strong>${structure.proyectos}</strong><span>Proyectos</span></div>
+                    <div><strong>${structure.actividadesGenerales + structure.actividades}</strong><span>Actividades</span></div>
+                  </div>
+
+                  <div class="vc-progress-row">
+                    <div class="vc-data vc-plan-progress ${escapeHTML(progressState.key)}" style="--vc-progress-color:${escapeHTML(progressState.color)}">
+                      <span>Avance del Plan</span>
+                      <strong>${hasMeasurement ? formatConsejeriaProgress(metric.progress) : "—"}</strong>
+                      <small>${escapeHTML(progressState.label)}</small>
+                    </div>
+                    <div class="vc-data vc-coverage-data">
+                      <span>Cobertura de medición</span>
+                      <strong>${metric.active === false ? "—" : formatConsejeriaProgress(metric.coverage)}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row-actions vc-card-actions">
+                  <button class="btn btn-secondary edit-vigencia-consejeria" type="button" data-id="${item.id}">Editar datos de la vigencia</button>
+                  <button class="btn btn-primary open-consejeria-workspace" type="button" data-id="${item.id}">Ver Consejería</button>
+                </div>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      `;
+
+      linkedContainer.querySelectorAll(".open-consejeria-workspace").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const record = vinculadas.find((item) => item.id === button.dataset.id);
+          await openWorkspace(record);
+        });
+      });
+
+      linkedContainer.querySelectorAll(".edit-vigencia-consejeria").forEach((button) => {
+        button.addEventListener("click", () => {
+          const record = vinculadas.find((item) => item.id === button.dataset.id);
+          if (!record) return;
+          openEditLinkForm({
+            record,
+            onSaved: renderLinked
+          });
+        });
+      });
+    } catch (error) {
+      console.error(error);
+      linkedContainer.innerHTML = `
+        <div class="empty-state">
+          <strong>No se pudo cargar la información de las Consejerías.</strong>
+          <p>${escapeHTML(friendlyErrorMessage(error, "Error inesperado"))}</p>
+        </div>
+      `;
+    }
+  }
+
+  try {
+    vigencias = await getVigencias();
+    selector.innerHTML = vigencias.length
+      ? vigencias.map((v) => option(v.id, `${v.nombre}${v.estado === "activa" ? " · activa" : ""}`)).join("")
+      : `<option value="">No hay vigencias</option>`;
+
+    if (vigencias.length) {
+      const requested = navigationTarget?.vigencia_id && vigencias.find((v) => v.id === navigationTarget.vigencia_id);
+      const active = vigencias.find((v) => v.estado === "activa");
+      selectedVigenciaId = requested?.id || active?.id || vigencias[0].id;
+      selector.value = selectedVigenciaId;
+    }
+
+    addConsejeriaButton.disabled = !selectedVigenciaId;
+
+    selector.addEventListener("change", async () => {
+      selectedVigenciaId = selector.value;
+      addConsejeriaButton.disabled = !selectedVigenciaId;
+      await renderLinked();
+    });
+
+    addConsejeriaButton?.addEventListener("click", async () => {
+      const vigencia = vigencias.find((item) => item.id === selectedVigenciaId);
+      if (!vigencia) return;
+
+      addConsejeriaButton.disabled = true;
+      const previousLabel = addConsejeriaButton.textContent;
+      addConsejeriaButton.textContent = "Cargando…";
+
+      try {
+        const catalogo = await getConsejerias();
+        openLinkForm({
+          vigencia,
+          catalogo,
+          vinculadas,
+          onSaved: renderLinked
+        });
+      } catch (error) {
+        console.error(error);
+        openModal({
+          title: "Agregar Consejería a esta vigencia",
+          content: `<div class="empty-state"><strong>No fue posible cargar el catálogo de Consejerías.</strong><p>${escapeHTML(friendlyErrorMessage(error, "Intenta nuevamente."))}</p><button id="closeLinkLoadError" class="btn btn-secondary" type="button">Cerrar</button></div>`
+        });
+        document.querySelector("#closeLinkLoadError")?.addEventListener("click", closeModal);
+      } finally {
+        addConsejeriaButton.disabled = false;
+        addConsejeriaButton.textContent = previousLabel;
+      }
+    });
+
+    await renderLinked();
+
+    if (navigationTarget?.vigencia_consejeria_id) {
+      const targetRecord = vinculadas.find((item) => item.id === navigationTarget.vigencia_consejeria_id);
+      if (targetRecord) {
+        await openWorkspace(targetRecord, { initialTab: navigationTarget.consejeria_tab || "resumen" });
+      }
+    }
+  } catch (error) {
+    console.error(error);
+    container.innerHTML = `
+      <section class="panel" style="margin-top:0">
+        <p class="eyebrow">Error</p>
+        <h2>No fue posible cargar Consejerías</h2>
+        <p class="muted">${escapeHTML(friendlyErrorMessage(error, "Intenta nuevamente."))}</p>
+      </section>
+    `;
+  }
+}
+
+export async function renderConsejeriasAdmin(container, navigationTarget = null) {
+  let catalogo = [];
+
+  container.innerHTML = `
+    <div class="page-actions configuration-consejerias-heading">
+      <div>
+        <p class="eyebrow">Catálogo institucional</p>
+        <h2>Consejerías</h2>
+        <p class="muted">Administra únicamente la definición institucional. La vinculación a periodos y los datos del consejero se gestionan desde el módulo Consejerías.</p>
+      </div>
+      <button id="newConsejeriaButton" class="btn btn-primary" type="button">+ Nueva Consejería</button>
+    </div>
+
+    <section class="panel" style="margin-top:0">
       <div class="panel-header">
         <div>
-          <p class="eyebrow">Catálogo institucional</p>
+          <p class="eyebrow">Estructura institucional</p>
           <h2>Consejerías disponibles</h2>
         </div>
         <span id="catalogCount" class="status-chip">0</span>
       </div>
 
-      <div id="catalogoConsejerias" style="margin-top: 18px"></div>
+      <div id="catalogoConsejerias" style="margin-top:18px">
+        <div class="empty-state">Cargando…</div>
+      </div>
     </section>
   `;
 
-  const consejeriasListView = document.createElement("div");
-  consejeriasListView.id = "consejeriasListView";
+  const catalogContainer = container.querySelector("#catalogoConsejerias");
+  const catalogCount = container.querySelector("#catalogCount");
+  const newButton = container.querySelector("#newConsejeriaButton");
 
-  while (container.firstChild) {
-    consejeriasListView.appendChild(container.firstChild);
-  }
-
-  container.appendChild(consejeriasListView);
-
-  const selector = document.querySelector("#vigenciaSelector");
-  const linkedContainer = document.querySelector("#linkedConsejerias");
-  const catalogContainer = document.querySelector("#catalogoConsejerias");
-  const catalogCount = document.querySelector("#catalogCount");
-  const newButton = document.querySelector("#newConsejeriaButton");
-  const linkButton = document.querySelector("#linkConsejeriaButton");
-
-  async function loadBase() {
-    [vigencias, catalogo] = await Promise.all([
-      getVigencias(),
-      getConsejerias()
-    ]);
-
-    selector.innerHTML = vigencias.length
-      ? vigencias.map((v) => option(v.id, `${v.nombre}${v.estado === "activa" ? " · activa" : ""}`)).join("")
-      : `<option value="">No hay vigencias</option>`;
-
-    if (!selectedVigenciaId && vigencias.length) {
-      const requested =
-        navigationTarget?.vigencia_id &&
-        vigencias.find((v) => v.id === navigationTarget.vigencia_id);
-
-      const active = vigencias.find((v) => v.estado === "activa");
-      selectedVigenciaId = requested?.id || active?.id || vigencias[0].id;
-    }
-
-    selector.value = selectedVigenciaId;
-    linkButton.disabled = !selectedVigenciaId;
-
+  async function loadCatalog() {
+    catalogo = await getConsejerias();
     renderCatalog();
-    await renderLinked();
   }
 
   function renderCatalog() {
@@ -973,8 +1319,8 @@ export async function renderConsejerias(container, navigationTarget = null) {
     if (!catalogo.length) {
       catalogContainer.innerHTML = `
         <div class="empty-state">
-          <strong>Aún no existe el catálogo de consejerías.</strong>
-          <p>Crea la primera consejería con su nombre largo y nombre corto.</p>
+          <strong>Aún no existe el catálogo de Consejerías.</strong>
+          <p>Crea la primera Consejería institucional. Después podrá agregarse a una vigencia desde el módulo Consejerías.</p>
         </div>
       `;
       return;
@@ -1009,12 +1355,8 @@ export async function renderConsejerias(container, navigationTarget = null) {
             </p>
 
             <div class="entity-actions">
-              <button class="btn btn-secondary edit-catalog" type="button" data-id="${item.id}">
-                Editar
-              </button>
-              <button class="btn btn-danger delete-catalog" type="button" data-id="${item.id}">
-                Eliminar
-              </button>
+              <button class="btn btn-secondary edit-catalog" type="button" data-id="${item.id}">Editar</button>
+              <button class="btn btn-danger delete-catalog" type="button" data-id="${item.id}">Eliminar</button>
             </div>
           </article>
         `).join("")}
@@ -1024,10 +1366,7 @@ export async function renderConsejerias(container, navigationTarget = null) {
     catalogContainer.querySelectorAll(".edit-catalog").forEach((button) => {
       button.addEventListener("click", () => {
         const record = catalogo.find((item) => item.id === button.dataset.id);
-        openConsejeriaForm({
-          record,
-          onSaved: loadBase
-        });
+        openConsejeriaForm({ record, onSaved: loadCatalog });
       });
     });
 
@@ -1036,341 +1375,26 @@ export async function renderConsejerias(container, navigationTarget = null) {
         const record = catalogo.find((item) => item.id === button.dataset.id);
         await openDeleteConsejeriaDialog({
           record,
-          onDeleted: loadBase,
-          onInactivated: loadBase
+          onDeleted: loadCatalog,
+          onInactivated: loadCatalog
         });
       });
     });
   }
-
-  async function openConsejeriaWorkspaceRecord(record, { initialTab = "perfil" } = {}) {
-    const vigencia = vigencias.find(
-      (item) => item.id === selectedVigenciaId
-    );
-
-    if (!record || !vigencia) return;
-
-    consejeriasListView.classList.add("hidden");
-
-    const oldHost = container.querySelector(
-      "#activeConsejeriaWorkspace"
-    );
-
-    if (oldHost) oldHost.remove();
-
-    const workspaceHost = document.createElement("div");
-    workspaceHost.id = "activeConsejeriaWorkspace";
-    container.appendChild(workspaceHost);
-
-    await renderConsejeriaWorkspace(workspaceHost, {
-      vigencia,
-      record,
-      initialTab,
-      progressMetric:
-        progressMetrics.get(record.id) || null,
-
-      onChanged: async () => {
-        catalogo = await getConsejerias();
-        renderCatalog();
-        await renderLinked();
-      },
-
-      onBack: async () => {
-        workspaceHost.remove();
-        consejeriasListView.classList.remove("hidden");
-        catalogo = await getConsejerias();
-        renderCatalog();
-        await renderLinked();
-      }
-    });
-  }
-
-  async function renderLinked() {
-    if (!selectedVigenciaId) {
-      linkedContainer.innerHTML = `
-        <div class="empty-state">
-          <strong>No hay una vigencia disponible.</strong>
-          <p>Crea primero una vigencia para vincular consejerías.</p>
-        </div>
-      `;
-      return;
-    }
-
-    linkedContainer.innerHTML = `<div class="empty-state">Cargando consejerías de la vigencia…</div>`;
-
-    try {
-      const [
-        vinculadas,
-        loadedProgressMetrics
-      ] = await Promise.all([
-        getVigenciaConsejerias(
-          selectedVigenciaId
-        ),
-        getConsejeriaProgressMap(
-          selectedVigenciaId
-        )
-      ]);
-
-      progressMetrics =
-        loadedProgressMetrics;
-
-      if (!vinculadas.length) {
-        linkedContainer.innerHTML = `
-          <div class="empty-state">
-            <strong>Esta vigencia aún no tiene consejerías vinculadas.</strong>
-            <p>Usa el botón <strong>Vincular</strong> para agregarlas desde el catálogo institucional.</p>
-          </div>
-        `;
-        return;
-      }
-
-      linkedContainer.innerHTML = `
-        <div class="vigencia-consejerias-grid">
-          ${vinculadas.map((item) => {
-            const c = item.consejerias || {};
-            const personFallback = initials(
-              item.responsable ||
-              c.nombre_corto ||
-              "ON"
-            );
-
-            const metric =
-              progressMetrics.get(
-                item.id
-              ) || {
-                progress: 0,
-                coverage: 0,
-                active:
-                  item.estado ===
-                  "activa"
-              };
-
-            const progressState =
-              getConsejeriaProgressState(
-                metric
-              );
-
-            const hasMeasurement =
-              metric.active !== false &&
-              Number(
-                metric.coverage || 0
-              ) > 0;
-
-            return `
-              <article class="vigencia-consejeria-card ${item.estado === "inactiva" ? "is-inactive" : ""}">
-                <div class="vc-card-header">
-                  <div class="consejero-photo-wrap">
-                    ${mediaPreviewHTML({
-                      url: item.foto_url,
-                      kind: "photo",
-                      fallback: personFallback,
-                      alt: item.responsable || "Consejero/a"
-                    })}
-                  </div>
-
-                  <div class="vc-card-title">
-                    <div class="vc-title-line">
-                      <div class="entity-icon-wrap small">
-                        ${mediaPreviewHTML({
-                          url: c.icono_url,
-                          kind: "icon",
-                          fallback: initials(c.nombre_corto),
-                          alt: `Ícono de ${c.nombre_corto || "consejería"}`
-                        })}
-                      </div>
-
-                      <div>
-                        <p class="eyebrow">${escapeHTML(c.nombre_corto || "Consejería")}</p>
-                        <h3>${escapeHTML(c.nombre_largo || "")}</h3>
-                      </div>
-                    </div>
-                  </div>
-
-                  ${statusChip(item.estado)}
-                </div>
-
-                <div class="vc-card-body">
-                  <div class="vc-data">
-                    <span>Responsable</span>
-                    <strong>${escapeHTML(item.responsable || "Sin registrar")}</strong>
-                  </div>
-
-                  <div class="vc-data">
-                    <span>Pueblo</span>
-                    <strong>${escapeHTML(item.pueblo || "Sin registrar")}</strong>
-                  </div>
-
-                  <div
-                    class="vc-data vc-plan-progress ${escapeHTML(progressState.key)}"
-                    style="--vc-progress-color: ${escapeHTML(progressState.color)}"
-                  >
-                    <span>Avance del Plan</span>
-
-                    <strong>
-                      ${
-                        hasMeasurement
-                          ? formatConsejeriaProgress(
-                              metric.progress
-                            )
-                          : "—"
-                      }
-                    </strong>
-
-                    <small>
-                      ${escapeHTML(progressState.label)}
-                    </small>
-                  </div>
-
-                  <div class="vc-data vc-coverage-data">
-                    <span>Cobertura de medición</span>
-
-                    <strong>
-                      ${
-                        metric.active === false
-                          ? "—"
-                          : formatConsejeriaProgress(
-                              metric.coverage
-                            )
-                      }
-                    </strong>
-
-                    <div
-                      class="vc-coverage-bar"
-                      aria-hidden="true"
-                    >
-                      <span
-                        style="width: ${
-                          metric.active === false
-                            ? 0
-                            : Math.max(
-                                0,
-                                Math.min(
-                                  100,
-                                  Number(
-                                    metric.coverage ||
-                                    0
-                                  )
-                                )
-                              )
-                        }%"
-                      ></span>
-                    </div>
-                  </div>
-
-                  ${item.detalle
-                    ? `<p class="muted vc-detail">${escapeHTML(item.detalle)}</p>`
-                    : ""}
-                </div>
-
-                <div class="row-actions">
-                  <button
-                    class="btn btn-primary open-consejeria-workspace"
-                    type="button"
-                    data-id="${item.id}"
-                  >
-                    Abrir consejería
-                  </button>
-
-                  <button
-                    class="${item.estado === "activa" ? "btn btn-danger" : "btn btn-secondary"} retire-link"
-                    type="button"
-                    data-id="${item.id}"
-                  >
-                    ${item.estado === "activa" ? "Retirar" : "Reactivar"}
-                  </button>
-                </div>
-              </article>
-            `;
-          }).join("")}
-        </div>
-      `;
-
-      linkedContainer
-        .querySelectorAll(".open-consejeria-workspace")
-        .forEach((button) => {
-          button.addEventListener("click", async () => {
-            const record = vinculadas.find(
-              (item) => item.id === button.dataset.id
-            );
-
-            await openConsejeriaWorkspaceRecord(record);
-          });
-        });
-
-      linkedContainer.querySelectorAll(".retire-link").forEach((button) => {
-        button.addEventListener("click", () => {
-          const record = vinculadas.find((item) => item.id === button.dataset.id);
-          openRetireDialog({
-            record,
-            onSaved: renderLinked
-          });
-        });
-      });
-    } catch (error) {
-      console.error(error);
-      linkedContainer.innerHTML = `
-        <div class="empty-state">
-          <strong>No se pudo cargar la vinculación de consejerías.</strong>
-          <p>${escapeHTML(friendlyErrorMessage(error, "Error inesperado"))}</p>
-        </div>
-      `;
-    }
-  }
-
-  selector.addEventListener("change", async () => {
-    selectedVigenciaId = selector.value;
-    await renderLinked();
-  });
 
   newButton.addEventListener("click", () => {
-    openConsejeriaForm({
-      onSaved: loadBase
-    });
-  });
-
-  linkButton.addEventListener("click", async () => {
-    const vigencia = vigencias.find((item) => item.id === selectedVigenciaId);
-    if (!vigencia) return;
-
-    const vinculadas = await getVigenciaConsejerias(selectedVigenciaId);
-
-    openLinkForm({
-      vigencia,
-      catalogo,
-      vinculadas,
-      onSaved: async () => {
-        catalogo = await getConsejerias();
-        renderCatalog();
-        await renderLinked();
-      }
-    });
+    openConsejeriaForm({ onSaved: loadCatalog });
   });
 
   try {
-    await loadBase();
-
-    if (navigationTarget?.vigencia_consejeria_id) {
-      const vinculadas = await getVigenciaConsejerias(
-        selectedVigenciaId
-      );
-
-      const targetRecord = vinculadas.find(
-        (item) => item.id === navigationTarget.vigencia_consejeria_id
-      );
-
-      if (targetRecord) {
-        await openConsejeriaWorkspaceRecord(targetRecord, {
-          initialTab: navigationTarget.consejeria_tab || "perfil"
-        });
-      }
-    }
+    await loadCatalog();
   } catch (error) {
     console.error(error);
     container.innerHTML = `
-      <section class="panel" style="margin-top: 0">
+      <section class="panel" style="margin-top:0">
         <p class="eyebrow">Error</p>
-        <h2>No fue posible cargar Consejerías</h2>
-        <p class="muted">${escapeHTML(friendlyErrorMessage(error, "No fue posible cargar las Consejerías. Intenta nuevamente."))}</p>
+        <h2>No fue posible cargar el catálogo de Consejerías</h2>
+        <p class="muted">${escapeHTML(friendlyErrorMessage(error, "Intenta nuevamente."))}</p>
       </section>
     `;
   }

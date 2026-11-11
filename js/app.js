@@ -1,21 +1,22 @@
-import { supabaseClient, isSupabaseConfigured } from "./supabaseClient.js?v=5.4.5";
-import { renderInicio } from "./modules/inicio.js?v=5.4.5";
-import { renderVigencias } from "./modules/vigencias.js?v=5.4.5";
-import { renderConsejerias } from "./modules/consejerias.js?v=5.4.5";
-import { renderMandatos } from "./modules/mandatos.js?v=5.4.5";
-import { renderSeguimientoMandatos } from "./modules/seguimientoMandatos.js?v=5.4.5";
-import { renderMiTrabajo } from "./modules/miTrabajo.js?v=5.4.5";
-import { renderControlCalidad } from "./modules/controlCalidad.js?v=5.4.5";
-import { initGlobalSearch } from "./modules/buscadorGlobal.js?v=5.4.5";
-import { renderLineas } from "./modules/lineas.js?v=5.4.5";
-import { renderProgramas } from "./modules/programas.js?v=5.4.5";
-import { renderProyectos } from "./modules/proyectos.js?v=5.4.5";
-import { renderPonderaciones } from "./modules/ponderaciones.js?v=5.4.5";
-import { renderCortesSeguimiento } from "./modules/cortesSeguimiento.js?v=5.4.5";
-import { renderAlertasTareas } from "./modules/alertasTareas.js?v=5.4.5";
-import { renderHistorial } from "./modules/historial.js?v=5.4.5";
-import { renderUsuarios } from "./modules/usuarios.js?v=5.4.5";
-import { initAuditoria, clearAuditContext } from "./modules/auditoria.js?v=5.4.5";
+import { supabaseClient, isSupabaseConfigured } from "./supabaseClient.js?v=5.4.7";
+import { renderInicio } from "./modules/inicio.js?v=5.4.7";
+import { renderVigencias } from "./modules/vigencias.js?v=5.4.7";
+import { renderConsejerias } from "./modules/consejerias.js?v=5.4.7";
+import { renderMandatos } from "./modules/mandatos.js?v=5.4.7";
+import { renderSeguimientoMandatos } from "./modules/seguimientoMandatos.js?v=5.4.7";
+import { renderMiTrabajo } from "./modules/miTrabajo.js?v=5.4.7";
+import { renderControlCalidad } from "./modules/controlCalidad.js?v=5.4.7";
+import { initGlobalSearch } from "./modules/buscadorGlobal.js?v=5.4.7";
+import { renderLineas } from "./modules/lineas.js?v=5.4.7";
+import { renderProgramas } from "./modules/programas.js?v=5.4.7";
+import { renderProyectos } from "./modules/proyectos.js?v=5.4.7";
+import { renderPonderaciones } from "./modules/ponderaciones.js?v=5.4.7";
+import { renderCortesSeguimiento } from "./modules/cortesSeguimiento.js?v=5.4.7";
+import { renderAlertasTareas } from "./modules/alertasTareas.js?v=5.4.7";
+import { renderHistorial } from "./modules/historial.js?v=5.4.7";
+import { renderUsuarios } from "./modules/usuarios.js?v=5.4.7";
+import { renderConfiguracion } from "./modules/configuracion.js?v=5.4.7";
+import { initAuditoria, clearAuditContext } from "./modules/auditoria.js?v=5.4.7";
 import {
   loadCurrentUserProfile,
   clearSecuritySession,
@@ -26,8 +27,8 @@ import {
   applyViewPermissions,
   startPermissionObserver,
   logSessionEvent
-} from "./security.js?v=5.4.5";
-import { friendlyErrorMessage } from "./userMessages.js?v=5.4.5";
+} from "./security.js?v=5.4.7";
+import { friendlyErrorMessage } from "./userMessages.js?v=5.4.7";
 import {
   initUserInterface,
   enhanceUserInterface,
@@ -36,7 +37,7 @@ import {
   setInterfaceView,
   confirmNavigationAway,
   clearInterfaceDirtyState
-} from "./components/uiSystem.js?v=5.4.5";
+} from "./components/uiSystem.js?v=5.4.7";
 
 const loginView = document.querySelector("#loginView");
 const appView = document.querySelector("#appView");
@@ -69,7 +70,8 @@ const views = {
   alertas: { title: "Alertas y tareas", render: (container, target) => renderAlertasTareas(container, target, { onNavigate: navigate }) },
   calidad: { title: "Control de calidad", render: renderControlCalidad },
   historial: { title: "Historial", render: renderHistorial },
-  usuarios: { title: "Usuarios", render: renderUsuarios }
+  usuarios: { title: "Usuarios", render: renderUsuarios },
+  configuracion: { title: "Configuración", render: renderConfiguracion }
 };
 
 function isMobileLayout() {
@@ -104,7 +106,7 @@ function showLogin(message = "") {
 }
 
 function viewAllowed(viewName) {
-  if (viewName === "usuarios") return canManageUsers();
+  if (viewName === "usuarios" || viewName === "configuracion") return canManageUsers();
   if (viewName === "historial") return canViewHistory();
   return true;
 }
