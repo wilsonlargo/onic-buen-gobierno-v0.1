@@ -1,8 +1,8 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
-import { updateWithVersion } from "../security.js?v=5.4.2";
-import { openModal, closeModal } from "../components/modal.js?v=5.4.2";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.2";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.4.2";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.5";
+import { updateWithVersion } from "../security.js?v=5.4.5";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.5";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.5";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.5";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -739,7 +739,9 @@ function normalizeImportRow(raw) {
     return "";
   }
 
-  const estadoRaw = normalizeText(pick("estado"));
+  const estadoOriginal = String(pick("estado") || "").trim();
+  const estadoRaw = normalizeText(estadoOriginal);
+  const ordenOriginal = String(pick("orden") || "").trim();
 
   return {
     nombre: String(
@@ -751,10 +753,15 @@ function normalizeImportRow(raw) {
     descripcion: String(
       pick("descripcion", "descripción", "detalle") || ""
     ).trim(),
-    orden: Number(pick("orden") || 0),
+    orden: Number(ordenOriginal || 0),
     estado: ["activa", "inactiva", "archivada"].includes(estadoRaw)
       ? estadoRaw
-      : "activa"
+      : "activa",
+    importMeta: {
+      ordenOriginal,
+      estadoOriginal,
+      estadoReconocido: !estadoOriginal || ["activa", "inactiva", "archivada"].includes(estadoRaw)
+    }
   };
 }
 
@@ -787,8 +794,13 @@ function validateImportRows(rawRows, existingLineas) {
     }
 
     if (!Number.isFinite(row.orden)) {
+      const received = row.importMeta?.ordenOriginal || "vacío";
       row.orden = 0;
-      warnings.push("Orden inválido: se usará 0");
+      warnings.push(`Orden incompatible (${received}): se usará 0`);
+    }
+
+    if (!row.importMeta?.estadoReconocido) {
+      warnings.push(`Estado no reconocido (${row.importMeta?.estadoOriginal || "vacío"}): se usará activa`);
     }
 
     return {
@@ -806,18 +818,27 @@ function importPreview(rows) {
     return `<div class="empty-state">Aún no hay datos para previsualizar.</div>`;
   }
 
+  const validCount = rows.filter((row) => row.valid).length;
+  const errorCount = rows.length - validCount;
+  const warningCount = rows.filter((row) => row.warnings.length).length;
+
   return `
     <div class="import-summary">
       <span class="status-chip active">
-        ${rows.filter((row) => row.valid).length} válidas
+        ${validCount} válidas
       </span>
-      <span class="status-chip">
-        ${rows.filter((row) => !row.valid).length} con error
+      <span class="status-chip ${errorCount ? "warning" : ""}">
+        ${errorCount} con error
       </span>
+
+      ${warningCount
+        ? `<span class="status-chip draft">${warningCount} ${warningCount === 1 ? "con advertencia" : "con advertencias"}</span>`
+        : ""
+      }
     </div>
 
     <div class="table-wrap import-preview-wrap">
-      <table class="data-table compact-table">
+      <table class="data-table compact-table import-preview-table import-preview-table-compact">
         <thead>
           <tr>
             <th>#</th>
@@ -862,11 +883,13 @@ function openImportLineas({
   onImported
 }) {
   let validatedRows = [];
+  let pasteTimer = null;
 
   openModal({
     title: "Importar Líneas de Acción",
+    size: "wide",
     content: `
-      <div class="context-ribbon">
+      <div class="context-ribbon import-context-ribbon">
         <div>
           <span>Vigencia</span>
           <strong>${escapeHTML(vigencia.nombre)}</strong>
@@ -877,20 +900,22 @@ function openImportLineas({
         </div>
       </div>
 
-      <div class="danger-callout soft-callout">
-        <strong>La importación se realizará únicamente en esta Consejería.</strong>
-        <p>
-          Cambia la Consejería antes de abrir este formulario si deseas importar
-          Líneas de Acción en otra dependencia.
-        </p>
+      <div class="import-assist-callout">
+        <div>
+          <strong>Importación asistida</strong>
+          <p>Las Líneas se cargarán únicamente en la Consejería seleccionada. El sistema revisa nombres repetidos, orden y estado antes de guardar y te indica qué filas necesitan revisión.</p>
+        </div>
       </div>
 
-      <div class="import-methods">
+      <div class="import-methods import-methods-clean">
         <section class="import-method">
-          <h3>Pegar desde una tabla</h3>
-          <p class="muted">
-            Copia filas desde Excel o Google Sheets y pégalas aquí.
-          </p>
+          <div class="import-method-heading">
+            <span class="import-step">1</span>
+            <div>
+              <h3>Pegar tabla</h3>
+              <p class="muted">Copia desde Excel o Google Sheets. La validación comienza al pegar.</p>
+            </div>
+          </div>
 
           <textarea
             id="pasteLineas"
@@ -898,46 +923,81 @@ function openImportLineas({
             placeholder="nombre&#9;nombre_corto&#9;descripcion&#9;orden&#9;estado"
           ></textarea>
 
-          <button id="parseLineasPaste" class="btn btn-secondary" type="button">
-            Previsualizar
-          </button>
+          <small class="import-auto-hint">No necesitas pulsar otro botón: al pegar se genera la vista previa.</small>
         </section>
 
         <div class="import-divider"><span>o</span></div>
 
         <section class="import-method">
-          <h3>Importar archivo</h3>
-          <p class="muted">
-            Formatos admitidos: CSV, XLSX y XLS.
-          </p>
+          <div class="import-method-heading">
+            <span class="import-step">1</span>
+            <div>
+              <h3>Cargar archivo</h3>
+              <p class="muted">CSV, XLSX o XLS. El archivo se lee inmediatamente después de seleccionarlo.</p>
+            </div>
+          </div>
+
+          <label class="import-file-picker" for="lineasImportFile">
+            <span>Seleccionar archivo</span>
+            <small id="lineasImportFileName">Ningún archivo seleccionado</small>
+          </label>
 
           <input
             id="lineasImportFile"
-            class="file-input"
+            class="import-file-input-hidden"
             type="file"
             accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
           >
 
-          <button id="parseLineasFile" class="btn btn-secondary" type="button">
-            Leer archivo
-          </button>
+          <small class="import-auto-hint">Se usa la primera hoja del archivo y la primera fila debe contener los encabezados.</small>
         </section>
       </div>
 
-      <section class="import-template">
-        <strong>Encabezados recomendados</strong>
-        <code>nombre | nombre_corto | descripcion | orden | estado</code>
-      </section>
+      <details class="import-template import-template-details">
+        <summary>Ver columnas y formatos aceptados</summary>
+
+        <div class="import-template-body">
+          <strong>Encabezados recomendados</strong>
+          <code>nombre | nombre_corto | descripcion | orden | estado</code>
+
+          <div class="import-format-grid">
+            <p>
+              <strong>Nombre</strong>
+              Es obligatorio y no puede repetirse dentro de la Consejería ni dentro del mismo archivo.
+            </p>
+
+            <p>
+              <strong>Orden</strong>
+              Debe ser numérico. Si está vacío se usa <code>0</code>; si contiene un valor incompatible, se corrige a <code>0</code> y se informa en la vista previa.
+            </p>
+
+            <p>
+              <strong>Estado</strong>
+              Usa <code>activa</code>, <code>inactiva</code> o <code>archivada</code>. Si está vacío, se usa <code>activa</code>.
+            </p>
+          </div>
+        </div>
+      </details>
 
       <p id="lineasImportMessage" class="form-message"></p>
 
-      <div id="lineasImportPreview">
-        <div class="empty-state">
-          Pega una tabla o selecciona un archivo para comenzar.
+      <section class="import-preview-section">
+        <div class="import-preview-heading">
+          <div>
+            <span class="eyebrow">Paso 2</span>
+            <h3>Revisar antes de importar</h3>
+          </div>
+          <small>Solo se guardarán las filas marcadas como válidas.</small>
         </div>
-      </div>
 
-      <div class="form-actions sticky-actions">
+        <div id="lineasImportPreview">
+          <div class="empty-state import-empty-state">
+            Pega una tabla o selecciona un archivo. La vista previa aparecerá automáticamente.
+          </div>
+        </div>
+      </section>
+
+      <div class="form-actions sticky-actions import-sticky-actions">
         <button id="cancelLineasImport" class="btn btn-secondary" type="button">
           Cancelar
         </button>
@@ -951,6 +1011,7 @@ function openImportLineas({
 
   const paste = document.querySelector("#pasteLineas");
   const fileInput = document.querySelector("#lineasImportFile");
+  const fileName = document.querySelector("#lineasImportFileName");
   const preview = document.querySelector("#lineasImportPreview");
   const message = document.querySelector("#lineasImportMessage");
   const confirm = document.querySelector("#confirmLineasImport");
@@ -960,61 +1021,97 @@ function openImportLineas({
     preview.innerHTML = importPreview(validatedRows);
 
     const validCount = validatedRows.filter((row) => row.valid).length;
+    const errorCount = validatedRows.length - validCount;
+
     confirm.disabled = validCount === 0;
     confirm.textContent = validCount
       ? `Importar ${validCount} ${validCount === 1 ? "Línea" : "Líneas"}`
       : "Importar registros válidos";
+
+    if (errorCount) {
+      message.textContent = `${validCount} ${validCount === 1 ? "fila lista" : "filas listas"} y ${errorCount} ${errorCount === 1 ? "fila requiere revisión" : "filas requieren revisión"}.`;
+    } else if (validatedRows.length) {
+      message.textContent = `Todo listo: ${validatedRows.length} ${validatedRows.length === 1 ? "fila válida" : "filas válidas"}.`;
+    }
+  }
+
+  function parsePastedRows() {
+    const text = paste.value;
+
+    if (!text.trim()) {
+      validatedRows = [];
+      confirm.disabled = true;
+      confirm.textContent = "Importar registros válidos";
+      message.textContent = "";
+      preview.innerHTML = `
+        <div class="empty-state import-empty-state">
+          Pega una tabla o selecciona un archivo. La vista previa aparecerá automáticamente.
+        </div>
+      `;
+      return;
+    }
+
+    const rows = parseDelimitedText(text);
+
+    if (!rows.length) {
+      message.textContent = "No se detectaron filas para importar. Comprueba que la primera fila contenga encabezados.";
+      return;
+    }
+
+    setRows(rows);
+  }
+
+  async function loadSelectedFile() {
+    message.textContent = "";
+
+    const file = fileInput.files?.[0];
+
+    if (!file) {
+      fileName.textContent = "Ningún archivo seleccionado";
+      return;
+    }
+
+    fileName.textContent = file.name;
+    message.textContent = `Analizando ${file.name}…`;
+
+    try {
+      const extension = file.name.split(".").pop()?.toLowerCase();
+
+      if (!["csv", "xlsx", "xls"].includes(extension || "")) {
+        throw new Error("Formato no admitido. Usa un archivo CSV, XLSX o XLS.");
+      }
+
+      const rows = extension === "csv"
+        ? parseDelimitedText(await file.text())
+        : await readSpreadsheetFile(file);
+
+      if (!rows.length) {
+        message.textContent = "El archivo no contiene filas utilizables. Comprueba la primera hoja y los encabezados.";
+        return;
+      }
+
+      paste.value = "";
+      setRows(rows);
+    } catch (error) {
+      console.error(error);
+      message.textContent = friendlyErrorMessage(error, "No fue posible leer el archivo.");
+    }
   }
 
   document
     .querySelector("#cancelLineasImport")
     .addEventListener("click", closeModal);
 
-  document
-    .querySelector("#parseLineasPaste")
-    .addEventListener("click", () => {
-      message.textContent = "";
+  paste.addEventListener("paste", () => {
+    window.setTimeout(parsePastedRows, 0);
+  });
 
-      const rows = parseDelimitedText(paste.value);
+  paste.addEventListener("input", () => {
+    window.clearTimeout(pasteTimer);
+    pasteTimer = window.setTimeout(parsePastedRows, 350);
+  });
 
-      if (!rows.length) {
-        message.textContent = "No se detectaron filas para importar.";
-        return;
-      }
-
-      setRows(rows);
-    });
-
-  document
-    .querySelector("#parseLineasFile")
-    .addEventListener("click", async () => {
-      message.textContent = "";
-
-      const file = fileInput.files?.[0];
-
-      if (!file) {
-        message.textContent = "Selecciona primero un archivo.";
-        return;
-      }
-
-      try {
-        const extension = file.name.split(".").pop()?.toLowerCase();
-        const rows = extension === "csv"
-          ? parseDelimitedText(await file.text())
-          : await readSpreadsheetFile(file);
-
-        if (!rows.length) {
-          message.textContent = "El archivo no contiene filas utilizables.";
-          return;
-        }
-
-        setRows(rows);
-      } catch (error) {
-        console.error(error);
-        message.textContent =
-          friendlyErrorMessage(error, "No fue posible leer el archivo.");
-      }
-    });
+  fileInput.addEventListener("change", loadSelectedFile);
 
   confirm.addEventListener("click", async () => {
     const validRows = validatedRows.filter((row) => row.valid);
@@ -1055,6 +1152,7 @@ function openImportLineas({
     }
   });
 }
+
 
 export async function renderLineas(container, navigationTarget = null) {
   let vigencias = [];

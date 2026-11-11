@@ -1,19 +1,26 @@
-import { confirmNavigationAway } from "./uiSystem.js?v=5.4.2";
+import { confirmNavigationAway } from "./uiSystem.js?v=5.4.5";
 
 const backdrop = document.querySelector("#modalBackdrop");
 const body = document.querySelector("#modalBody");
 const title = document.querySelector("#modalTitle");
 const closeButton = document.querySelector("#modalClose");
+const modal = backdrop?.querySelector(".modal");
 
-export function openModal({ title: modalTitle, content }) {
+export function openModal({ title: modalTitle, content, size = "default" }) {
   title.textContent = modalTitle;
   body.innerHTML = content;
+
+  if (modal) {
+    modal.classList.toggle("modal-wide", size === "wide");
+    modal.classList.toggle("modal-large", size === "large");
+  }
   backdrop.classList.remove("hidden");
   backdrop.setAttribute("aria-hidden", "false");
 }
 
 export function closeModal() {
   backdrop.classList.add("hidden");
+  if (modal) modal.classList.remove("modal-wide", "modal-large");
   backdrop.setAttribute("aria-hidden", "true");
   body.innerHTML = "";
 }

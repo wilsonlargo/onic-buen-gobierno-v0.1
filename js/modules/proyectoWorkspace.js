@@ -1,10 +1,10 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
-import { updateWithVersion, logManualEvent } from "../security.js?v=5.4.2";
-import { openModal, closeModal } from "../components/modal.js?v=5.4.2";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.2";
-import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.2";
-import { renderProjectPlanner, plannerColorOptions, exportProjectPlanner } from "./projectPlanner.js?v=5.4.2";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.4.2";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.5";
+import { updateWithVersion, logManualEvent } from "../security.js?v=5.4.5";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.5";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.5";
+import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.5";
+import { renderProjectPlanner, plannerColorOptions, exportProjectPlanner } from "./projectPlanner.js?v=5.4.5";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.5";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -353,6 +353,18 @@ async function addIndicatorFollowup(payload) {
   if (error) throw error;
 }
 
+async function updateIndicatorFollowup(id, payload) {
+  const supabase = requireSupabase();
+  const { error } = await supabase.from("seguimientos_indicador").update(payload).eq("id", id);
+  if (error) throw error;
+}
+
+async function deleteIndicatorFollowup(id) {
+  const supabase = requireSupabase();
+  const { error } = await supabase.from("seguimientos_indicador").delete().eq("id", id);
+  if (error) throw error;
+}
+
 async function createBudgetItem(payload) {
   const supabase = requireSupabase();
   const { data, error } = await supabase.from("presupuesto_actividad_rubros").insert(payload).select().single();
@@ -384,6 +396,18 @@ async function updateEvidence(record, payload) {
 async function createActivityFollowup(payload) {
   const supabase = requireSupabase();
   const { error } = await supabase.from("seguimientos_actividad").insert(payload);
+  if (error) throw error;
+}
+
+async function updateActivityFollowup(id, payload) {
+  const supabase = requireSupabase();
+  const { error } = await supabase.from("seguimientos_actividad").update(payload).eq("id", id);
+  if (error) throw error;
+}
+
+async function deleteActivityFollowup(id) {
+  const supabase = requireSupabase();
+  const { error } = await supabase.from("seguimientos_actividad").delete().eq("id", id);
   if (error) throw error;
 }
 
@@ -545,19 +569,20 @@ function openIndicatorForm({ activityId, record = null, onSaved }) {
   });
 }
 
-function openIndicatorFollowup({ indicator, onSaved }) {
+function openIndicatorFollowup({ indicator, record = null, onSaved }) {
+  const editing = Boolean(record);
   openModal({
-    title: "Registrar avance del indicador",
+    title: editing ? "Editar avance del indicador" : "Registrar avance del indicador",
     content: `
       <div class="modal-context-block"><span>Indicador</span><strong>${escapeHTML(indicator.codigo || indicator.nombre)}</strong><p>${escapeHTML(indicator.nombre)}</p></div>
       <form id="indicatorFollowupForm">
         <div class="form-grid">
-          <div class="form-field"><label>Fecha de corte</label><input name="fecha_corte" type="date" required value="${todayISO()}"></div>
-          <div class="form-field"><label>Valor alcanzado</label><input name="valor" type="number" step="0.0001" required value="${Number(indicator.valor_actual ?? indicator.linea_base ?? 0)}"></div>
-          <div class="form-field full"><label>Observación</label><textarea name="observacion"></textarea></div>
+          <div class="form-field"><label>Fecha de corte</label><input name="fecha_corte" type="date" required value="${escapeHTML(record?.fecha_corte || todayISO())}"></div>
+          <div class="form-field"><label>Valor alcanzado</label><input name="valor" type="number" step="0.0001" required value="${Number(record?.valor ?? indicator.valor_actual ?? indicator.linea_base ?? 0)}"></div>
+          <div class="form-field full"><label>Observación del avance</label><textarea name="observacion">${escapeHTML(record?.observacion || "")}</textarea><small class="field-help">Describe brevemente qué explica este valor. El seguimiento cualitativo general se registra por separado.</small></div>
         </div>
         <p id="indicatorFollowupMessage" class="form-message"></p>
-        <div class="form-actions"><button id="cancelIndicatorFollowup" class="btn btn-secondary" type="button">Cancelar</button><button class="btn btn-primary" type="submit">Registrar avance</button></div>
+        <div class="form-actions"><button id="cancelIndicatorFollowup" class="btn btn-secondary" type="button">Cancelar</button><button class="btn btn-primary" type="submit">${editing ? "Guardar cambios" : "Registrar avance"}</button></div>
       </form>`
   });
   const form = document.querySelector("#indicatorFollowupForm");
@@ -568,19 +593,77 @@ function openIndicatorFollowup({ indicator, onSaved }) {
     const data = new FormData(form);
     const value = Number(data.get("valor"));
     if (!Number.isFinite(value)) { message.textContent = "El valor alcanzado debe ser numérico."; return; }
+    const payload = {
+      fecha_corte: data.get("fecha_corte"),
+      valor: value,
+      observacion: data.get("observacion")?.trim() || null
+    };
+    if (!editing) payload.indicador_id = indicator.id;
     const submit = form.querySelector('button[type="submit"]');
     submit.disabled = true;
     submit.textContent = "Guardando…";
     try {
-      await addIndicatorFollowup({ indicador_id: indicator.id, fecha_corte: data.get("fecha_corte"), valor: value, observacion: data.get("observacion")?.trim() || null });
+      if (editing) await updateIndicatorFollowup(record.id, payload);
+      else await addIndicatorFollowup(payload);
       closeModal();
       await onSaved();
     } catch (error) {
       console.error(error);
-      message.textContent = friendlyErrorMessage(error, "No fue posible registrar el avance.");
+      message.textContent = friendlyErrorMessage(error, editing ? "No fue posible actualizar el avance." : "No fue posible registrar el avance.");
       submit.disabled = false;
-      submit.textContent = "Registrar avance";
+      submit.textContent = editing ? "Guardar cambios" : "Registrar avance";
     }
+  });
+}
+
+function openIndicatorHistory({ indicator, onChanged }) {
+  getIndicatorFollowups([indicator.id]).then((records) => {
+    openModal({
+      title: `Historial · ${indicator.codigo || indicator.nombre}`,
+      content: records.length ? `
+        <div class="history-intro"><strong>${escapeHTML(indicator.nombre)}</strong><p>Estos cortes determinan el valor alcanzado actual. Puedes corregir o eliminar un registro; el indicador se recalcula automáticamente.</p></div>
+        <div class="advance-history-list">
+          ${records.map((item) => `
+            <article class="advance-history-row">
+              <div class="advance-history-main">
+                <span class="timeline-date">${formatDate(item.fecha_corte)}</span>
+                <strong>${formatNumber(item.valor, 4)}${indicator.unidad_medida ? ` ${escapeHTML(indicator.unidad_medida)}` : ""}</strong>
+                ${item.observacion ? `<p>${escapeHTML(item.observacion)}</p>` : `<p class="muted">Sin observación.</p>`}
+              </div>
+              <div class="row-actions compact-actions">
+                <button class="btn btn-secondary edit-indicator-followup" type="button" data-id="${item.id}">Editar</button>
+                <button class="icon-btn danger delete-indicator-followup" type="button" data-id="${item.id}" title="Eliminar avance">${trashIcon()}</button>
+              </div>
+            </article>`).join("")}
+        </div>` : `<div class="empty-state workspace-empty"><strong>Aún no hay avances registrados.</strong><p>Los cortes aparecerán aquí después de registrar el primer valor del indicador.</p></div>`
+    });
+    document.querySelectorAll(".edit-indicator-followup").forEach((button) => button.addEventListener("click", () => {
+      const record = records.find((item) => item.id === button.dataset.id);
+      closeModal();
+      openIndicatorFollowup({ indicator, record, onSaved: onChanged });
+    }));
+    document.querySelectorAll(".delete-indicator-followup").forEach((button) => button.addEventListener("click", () => {
+      const record = records.find((item) => item.id === button.dataset.id);
+      if (!record) return;
+      openModal({
+        title: "Eliminar avance registrado",
+        content: `<div class="danger-callout"><strong>${formatDate(record.fecha_corte)} · ${formatNumber(record.valor, 4)}${indicator.unidad_medida ? ` ${escapeHTML(indicator.unidad_medida)}` : ""}</strong><p>El registro se eliminará del historial y el valor alcanzado del indicador se recalculará usando el corte anterior.</p></div><div class="form-actions"><button id="cancelDeleteIndicatorFollowup" class="btn btn-secondary" type="button">Cancelar</button><button id="confirmDeleteIndicatorFollowup" class="btn btn-danger" type="button">Eliminar avance</button></div>`
+      });
+      document.querySelector("#cancelDeleteIndicatorFollowup").addEventListener("click", closeModal);
+      document.querySelector("#confirmDeleteIndicatorFollowup").addEventListener("click", async () => {
+        try {
+          await deleteIndicatorFollowup(record.id);
+          closeModal();
+          await onChanged();
+        } catch (error) {
+          console.error(error);
+          openModal({ title: "No fue posible eliminar", content: `<div class="danger-callout"><p>${escapeHTML(friendlyErrorMessage(error, "No fue posible eliminar el avance."))}</p></div>` });
+        }
+      });
+    }));
+  }).catch((error) => {
+    console.error(error);
+    openModal({ title: "No fue posible cargar el historial", content: `<div class="danger-callout"><p>${escapeHTML(friendlyErrorMessage(error, "No fue posible cargar el historial del indicador."))}</p></div>` });
   });
 }
 
@@ -693,20 +776,22 @@ function openEvidenceForm({ activityId, indicators, record = null, onSaved }) {
   });
 }
 
-function openActivityFollowup({ activityId, onSaved }) {
+function openActivityFollowup({ activityId, record = null, onSaved }) {
+  const editing = Boolean(record);
   openModal({
-    title: "Nuevo seguimiento de actividad",
+    title: editing ? "Editar seguimiento cualitativo" : "Nuevo seguimiento cualitativo",
     content: `
+      <div class="info-callout compact-callout"><strong>Seguimiento cualitativo</strong><p>Describe lo ocurrido en la Actividad. Este registro no modifica el porcentaje de avance técnico.</p></div>
       <form id="activityFollowupForm">
         <div class="form-grid">
-          <div class="form-field"><label>Fecha de corte</label><input name="fecha_corte" type="date" required value="${todayISO()}"></div>
-          <div class="form-field full"><label>Resumen</label><textarea name="resumen"></textarea></div>
-          <div class="form-field full"><label>Logros</label><textarea name="logros"></textarea></div>
-          <div class="form-field full"><label>Dificultades</label><textarea name="dificultades"></textarea></div>
-          <div class="form-field full"><label>Próximos pasos</label><textarea name="proximos_pasos"></textarea></div>
+          <div class="form-field"><label>Fecha de corte</label><input name="fecha_corte" type="date" required value="${escapeHTML(record?.fecha_corte || todayISO())}"></div>
+          <div class="form-field full"><label>Resumen</label><textarea name="resumen">${escapeHTML(record?.resumen || "")}</textarea></div>
+          <div class="form-field full"><label>Logros</label><textarea name="logros">${escapeHTML(record?.logros || "")}</textarea></div>
+          <div class="form-field full"><label>Dificultades</label><textarea name="dificultades">${escapeHTML(record?.dificultades || "")}</textarea></div>
+          <div class="form-field full"><label>Próximos pasos</label><textarea name="proximos_pasos">${escapeHTML(record?.proximos_pasos || "")}</textarea></div>
         </div>
         <p id="activityFollowupMessage" class="form-message"></p>
-        <div class="form-actions"><button id="cancelActivityFollowup" class="btn btn-secondary" type="button">Cancelar</button><button class="btn btn-primary" type="submit">Guardar seguimiento</button></div>
+        <div class="form-actions"><button id="cancelActivityFollowup" class="btn btn-secondary" type="button">Cancelar</button><button class="btn btn-primary" type="submit">${editing ? "Guardar cambios" : "Guardar seguimiento"}</button></div>
       </form>`
   });
   const form = document.querySelector("#activityFollowupForm");
@@ -715,25 +800,27 @@ function openActivityFollowup({ activityId, onSaved }) {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(form);
+    const payload = {
+      fecha_corte: data.get("fecha_corte"),
+      resumen: data.get("resumen")?.trim() || null,
+      logros: data.get("logros")?.trim() || null,
+      dificultades: data.get("dificultades")?.trim() || null,
+      proximos_pasos: data.get("proximos_pasos")?.trim() || null
+    };
+    if (!editing) payload.actividad_id = activityId;
     const submit = form.querySelector('button[type="submit"]');
     submit.disabled = true;
     submit.textContent = "Guardando…";
     try {
-      await createActivityFollowup({
-        actividad_id: activityId,
-        fecha_corte: data.get("fecha_corte"),
-        resumen: data.get("resumen")?.trim() || null,
-        logros: data.get("logros")?.trim() || null,
-        dificultades: data.get("dificultades")?.trim() || null,
-        proximos_pasos: data.get("proximos_pasos")?.trim() || null
-      });
+      if (editing) await updateActivityFollowup(record.id, payload);
+      else await createActivityFollowup(payload);
       closeModal();
       await onSaved();
     } catch (error) {
       console.error(error);
-      message.textContent = friendlyErrorMessage(error, "No fue posible guardar el seguimiento.");
+      message.textContent = friendlyErrorMessage(error, editing ? "No fue posible actualizar el seguimiento." : "No fue posible guardar el seguimiento.");
       submit.disabled = false;
-      submit.textContent = "Guardar seguimiento";
+      submit.textContent = editing ? "Guardar cambios" : "Guardar seguimiento";
     }
   });
 }
@@ -1726,7 +1813,7 @@ export async function renderProyectoWorkspace(container, options) {
               <div><span>Avance técnico</span><strong>${formatPercent(progress)}</strong></div>
             </div>
             <div class="progress-track large"><span class="progress-fill" style="width:${progress === null ? 0 : progress}%"></span></div>
-            <div class="entity-actions"><button class="btn btn-primary indicator-followup" type="button" data-id="${indicator.id}">Registrar avance</button><button class="btn btn-secondary audit-indicator-note" type="button" data-id="${indicator.id}">Nota</button><button class="btn btn-secondary edit-indicator" type="button" data-id="${indicator.id}">Editar</button><button class="icon-btn danger delete-indicator" type="button" data-id="${indicator.id}" title="Eliminar indicador">${trashIcon()}</button></div>
+            <div class="entity-actions"><button class="btn btn-primary indicator-followup" type="button" data-id="${indicator.id}">Registrar avance</button><button class="btn btn-secondary indicator-history-button" type="button" data-id="${indicator.id}">Historial</button><button class="btn btn-secondary edit-indicator" type="button" data-id="${indicator.id}">Editar indicador</button><button class="icon-btn danger delete-indicator" type="button" data-id="${indicator.id}" title="Eliminar indicador">${trashIcon()}</button></div>
           </article>`;
         }).join("")}</div>` : `<div class="empty-state workspace-empty"><strong>Esta actividad todavía no tiene indicadores.</strong><p>Sin indicadores el sistema no calcula avance técnico.</p></div>`}
       </section>`;
@@ -1738,36 +1825,20 @@ export async function renderProyectoWorkspace(container, options) {
       const indicator = rows.find((item) => item.id === button.dataset.id);
       openIndicatorFollowup({ indicator, onSaved: async () => { await refreshCurrentActivityData(); renderActivityWorkspace(); activityTab = "avance"; renderActivityTab(); showToast("Avance del indicador registrado."); } });
     }));
-    body.querySelectorAll(".audit-indicator-note").forEach((button) => button.addEventListener("click", () => {
+    body.querySelectorAll(".indicator-history-button").forEach((button) => button.addEventListener("click", () => {
       const indicator = rows.find((item) => item.id === button.dataset.id);
       if (!indicator) return;
-
-      openAuditPanel({
-        newNote: true,
-        contextOverride: {
-          vigenciaId: vigencia.id,
-          vigenciaNombre: vigencia.nombre,
-          entidadTipo: "indicador",
-          entidadId: indicator.id,
-          entidadNombre: indicator.codigo || indicator.nombre,
-          seccion: "avance",
-          ruta: `${vigencia.nombre} › ${vigenciaConsejeria.consejerias.nombre_corto} › ${linea.nombre} › ${programa.nombre} › ${project.nombre} › ${activity.nombre} › Indicador ${indicator.codigo || indicator.nombre}`,
-          navigation: {
-            ...baseAuditNavigation(),
-            project_tab: "actividades",
-            actividad_id: activity.id,
-            actividad_codigo: activity.codigo || "",
-            actividad_nombre: activity.nombre,
-            activity_tab: "avance",
-            indicador_id: indicator.id,
-            indicador_codigo: indicator.codigo || "",
-            indicador_nombre: indicator.nombre,
-            anchor: `audit-indicator-${indicator.id}`
-          }
+      openIndicatorHistory({
+        indicator,
+        onChanged: async () => {
+          await refreshCurrentActivityData();
+          renderActivityWorkspace();
+          activityTab = "avance";
+          await renderActivityTab();
+          showToast("Historial del indicador actualizado.");
         }
       });
     }));
-
     body.querySelectorAll(".edit-indicator").forEach((button) => button.addEventListener("click", () => {
       const indicator = rows.find((item) => item.id === button.dataset.id);
       openIndicatorForm({ activityId: activity.id, record: indicator, onSaved: async () => { await refreshCurrentActivityData(); renderActivityWorkspace(); activityTab = "avance"; renderActivityTab(); showToast("Indicador actualizado."); } });
@@ -1800,12 +1871,13 @@ export async function renderProyectoWorkspace(container, options) {
     body.insertAdjacentHTML("afterbegin", `
       <section class="workspace-section activity-advance-overview">
         <div class="workspace-section-heading activity-advance-heading">
-          <div><p class="eyebrow">Avance</p><h3>Avance de ${isGeneralActivityUnit(project) ? "la Actividad general" : "la Actividad"}</h3><p class="muted">Aquí registras los resultados de los indicadores y el seguimiento cualitativo. El porcentaje se calcula automáticamente.</p></div>
-          <div class="workspace-heading-actions"><button id="registerActivityAdvance" class="btn btn-primary" type="button">Registrar avance</button><button id="registerActivityFollowup" class="btn btn-secondary" type="button">Registrar seguimiento</button></div>
+          <div><p class="eyebrow">Avance</p><h3>Avance de ${isGeneralActivityUnit(project) ? "la Actividad general" : "la Actividad"}</h3><p class="muted">Consulta el avance consolidado y registra el seguimiento cualitativo. El avance técnico se calcula automáticamente a partir de los indicadores.</p></div>
+          <div class="workspace-heading-actions"><button id="registerActivityFollowup" class="btn btn-secondary" type="button">Registrar seguimiento</button></div>
         </div>
         <div class="tracking-summary-grid activity-advance-summary">
           <div class="tracking-summary-card"><span>Avance técnico</span><strong>${formatPercent(technicalProgress)}</strong><small>Calculado automáticamente</small></div>
           <div class="tracking-summary-card"><span>Indicadores activos</span><strong>${activeIndicators.length}</strong><small>${activityIndicators.length} registrados</small></div>
+          <div class="tracking-summary-card"><span>Registros de avance</span><strong id="advanceRecordCount">—</strong><small>Cortes de indicadores</small></div>
           <div class="tracking-summary-card"><span>Evidencias activas</span><strong>${evidenceForActivity(activity.id).filter((item) => item.estado === "activa").length}</strong><small>Soportes registrados</small></div>
         </div>
       </section>`);
@@ -1823,26 +1895,50 @@ export async function renderProyectoWorkspace(container, options) {
       getIndicatorFollowups(activityIndicators.map((item) => item.id))
     ]);
     const indicatorMap = new Map(activityIndicators.map((indicator) => [indicator.id, indicator]));
+    const advanceRecordCount = body.querySelector("#advanceRecordCount");
+    if (advanceRecordCount) advanceRecordCount.textContent = String(indicatorFollowups.length);
 
     body.insertAdjacentHTML("beforeend", `
       <section class="workspace-section workspace-section-flush activity-followup-section">
-        <div class="workspace-section-heading"><div><p class="eyebrow">Seguimiento cualitativo</p><h3>Logros, dificultades y próximos pasos</h3><p class="muted">Complementa el avance numérico con información sobre lo realizado y lo que sigue.</p></div><button id="newActivityFollowupInline" class="btn btn-secondary" type="button">Registrar seguimiento</button></div>
-        ${followups.length ? `<div class="timeline-list">${followups.map((item) => `<article class="timeline-card"><div class="timeline-date">${formatDate(item.fecha_corte)}</div>${item.resumen ? `<div><span>Resumen</span><p>${escapeHTML(item.resumen)}</p></div>` : ""}${item.logros ? `<div><span>Logros</span><p>${escapeHTML(item.logros)}</p></div>` : ""}${item.dificultades ? `<div><span>Dificultades</span><p>${escapeHTML(item.dificultades)}</p></div>` : ""}${item.proximos_pasos ? `<div><span>Próximos pasos</span><p>${escapeHTML(item.proximos_pasos)}</p></div>` : ""}</article>`).join("")}</div>` : `<div class="empty-state workspace-empty"><strong>Aún no hay seguimiento cualitativo.</strong><p>Registra logros, dificultades y próximos pasos cuando hagas un corte de seguimiento.</p></div>`}
-        ${indicatorFollowups.length ? `<details class="historical-records indicator-history"><summary>Ver histórico de valores de indicadores (${indicatorFollowups.length})</summary><div class="timeline-list compact-timeline">${indicatorFollowups.map((item) => { const indicator = indicatorMap.get(item.indicador_id); return `<article class="timeline-card"><div class="timeline-date">${formatDate(item.fecha_corte)}</div><strong>${escapeHTML(indicator?.codigo || indicator?.nombre || "Indicador")}</strong><p>Valor: <strong>${formatNumber(item.valor, 4)}</strong>${indicator?.unidad_medida ? ` ${escapeHTML(indicator.unidad_medida)}` : ""}</p>${item.observacion ? `<p class="muted">${escapeHTML(item.observacion)}</p>` : ""}</article>`; }).join("")}</div></details>` : ""}
+        <div class="workspace-section-heading"><div><p class="eyebrow">Seguimiento cualitativo</p><h3>Bitácora de la actividad</h3><p class="muted">Registra logros, dificultades, decisiones y próximos pasos. Este seguimiento explica lo ocurrido, pero no modifica el porcentaje de avance técnico.</p></div><button id="newActivityFollowupInline" class="btn btn-secondary" type="button">Registrar seguimiento</button></div>
+        ${followups.length ? `<div class="timeline-list">${followups.map((item) => `<article class="timeline-card activity-followup-card" data-id="${item.id}"><div class="timeline-card-heading"><div class="timeline-date">${formatDate(item.fecha_corte)}</div><div class="row-actions compact-actions"><button class="btn btn-secondary edit-activity-followup" type="button" data-id="${item.id}">Editar</button><button class="icon-btn danger delete-activity-followup" type="button" data-id="${item.id}" title="Eliminar seguimiento">${trashIcon()}</button></div></div>${item.resumen ? `<div><span>Resumen</span><p>${escapeHTML(item.resumen)}</p></div>` : ""}${item.logros ? `<div><span>Logros</span><p>${escapeHTML(item.logros)}</p></div>` : ""}${item.dificultades ? `<div><span>Dificultades</span><p>${escapeHTML(item.dificultades)}</p></div>` : ""}${item.proximos_pasos ? `<div><span>Próximos pasos</span><p>${escapeHTML(item.proximos_pasos)}</p></div>` : ""}</article>`).join("")}</div>` : `<div class="empty-state workspace-empty"><strong>Aún no hay seguimiento cualitativo.</strong><p>Registra logros, dificultades y próximos pasos cuando hagas un corte de seguimiento.</p></div>`}
       </section>`);
 
-    const registerAdvance = () => openActivityAdvanceChooser({
-      indicators: activityIndicators,
-      onSaved: async () => refreshAdvance("Avance registrado.")
-    });
     const registerFollowup = () => openActivityFollowup({
       activityId: activity.id,
       onSaved: async () => refreshAdvance("Seguimiento registrado.")
     });
 
-    body.querySelector("#registerActivityAdvance")?.addEventListener("click", registerAdvance);
     body.querySelector("#registerActivityFollowup")?.addEventListener("click", registerFollowup);
     body.querySelector("#newActivityFollowupInline")?.addEventListener("click", registerFollowup);
+    body.querySelectorAll(".edit-activity-followup").forEach((button) => button.addEventListener("click", () => {
+      const record = followups.find((item) => item.id === button.dataset.id);
+      if (!record) return;
+      openActivityFollowup({
+        activityId: activity.id,
+        record,
+        onSaved: async () => refreshAdvance("Seguimiento actualizado.")
+      });
+    }));
+    body.querySelectorAll(".delete-activity-followup").forEach((button) => button.addEventListener("click", () => {
+      const record = followups.find((item) => item.id === button.dataset.id);
+      if (!record) return;
+      openModal({
+        title: "Eliminar seguimiento cualitativo",
+        content: `<div class="danger-callout"><strong>${formatDate(record.fecha_corte)}</strong><p>Se eliminará este registro de la bitácora. Esta acción no modifica el avance técnico de los indicadores.</p></div><div class="form-actions"><button id="cancelDeleteActivityFollowup" class="btn btn-secondary" type="button">Cancelar</button><button id="confirmDeleteActivityFollowup" class="btn btn-danger" type="button">Eliminar seguimiento</button></div>`
+      });
+      document.querySelector("#cancelDeleteActivityFollowup").addEventListener("click", closeModal);
+      document.querySelector("#confirmDeleteActivityFollowup").addEventListener("click", async () => {
+        try {
+          await deleteActivityFollowup(record.id);
+          closeModal();
+          await refreshAdvance("Seguimiento eliminado.");
+        } catch (error) {
+          console.error(error);
+          showToast(friendlyErrorMessage(error, "No fue posible eliminar el seguimiento."));
+        }
+      });
+    }));
   }
 
   function renderBudget() {

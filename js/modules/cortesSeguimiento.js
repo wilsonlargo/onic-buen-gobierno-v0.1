@@ -1,9 +1,9 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
-import { getCurrentProfile, canManageGlobalStructure } from "../security.js?v=5.4.2";
-import { openModal, closeModal } from "../components/modal.js?v=5.4.2";
-import { setAuditContext } from "./auditoria.js?v=5.4.2";
-import { getConsejeriaProgressMap } from "./consejeriaProgress.js?v=5.4.2";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.4.2";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.5";
+import { getCurrentProfile, canManageGlobalStructure } from "../security.js?v=5.4.5";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.5";
+import { setAuditContext } from "./auditoria.js?v=5.4.5";
+import { getConsejeriaProgressMap } from "./consejeriaProgress.js?v=5.4.5";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.5";
 
 function escapeHTML(value = "") {
   return String(value ?? "")

@@ -1,9 +1,9 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.2";
-import { updateWithVersion } from "../security.js?v=5.4.2";
-import { openModal, closeModal } from "../components/modal.js?v=5.4.2";
-import { renderProyectoWorkspace } from "./proyectoWorkspace.js?v=5.4.2";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.2";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.4.2";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.5";
+import { updateWithVersion } from "../security.js?v=5.4.5";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.5";
+import { renderProyectoWorkspace } from "./proyectoWorkspace.js?v=5.4.5";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.5";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.5";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -1404,7 +1404,9 @@ async function readSpreadsheetFile(file) {
   }
 
   const buffer = await file.arrayBuffer();
-  const workbook = window.XLSX.read(buffer);
+  const workbook = window.XLSX.read(buffer, {
+    cellDates: false
+  });
   const firstSheetName = workbook.SheetNames[0];
 
   if (!firstSheetName) return [];
@@ -1414,7 +1416,7 @@ async function readSpreadsheetFile(file) {
   return window.XLSX.utils
     .sheet_to_json(sheet, {
       defval: "",
-      raw: false
+      raw: true
     })
     .map((row) => {
       const normalized = {};
@@ -1422,11 +1424,208 @@ async function readSpreadsheetFile(file) {
       Object.entries(row).forEach(([key, value]) => {
         normalized[
           normalizeText(key).replace(/\s+/g, "_")
-        ] = String(value ?? "").trim();
+        ] = value ?? "";
       });
 
       return normalized;
     });
+}
+
+function isoDateFromParts(year, month, day) {
+  const y = Number(year);
+  const m = Number(month);
+  const d = Number(day);
+
+  if (![y, m, d].every(Number.isInteger)) return "";
+  if (y < 1900 || y > 2200 || m < 1 || m > 12 || d < 1 || d > 31) return "";
+
+  const date = new Date(Date.UTC(y, m - 1, d));
+
+  if (
+    date.getUTCFullYear() !== y ||
+    date.getUTCMonth() !== m - 1 ||
+    date.getUTCDate() !== d
+  ) {
+    return "";
+  }
+
+  return `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+function normalizeImportYear(value) {
+  const year = Number(value);
+
+  if (!Number.isInteger(year)) return NaN;
+  if (year >= 100) return year;
+  return year <= 69 ? 2000 + year : 1900 + year;
+}
+
+function excelSerialToISO(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number) || number < 20000 || number > 100000) return "";
+
+  const parsed = window.XLSX?.SSF?.parse_date_code?.(number);
+  if (!parsed) return "";
+
+  return isoDateFromParts(parsed.y, parsed.m, parsed.d);
+}
+
+function normalizeImportDate(value, label) {
+  const original = value instanceof Date
+    ? value.toISOString()
+    : String(value ?? "").trim();
+
+  if (value === null || value === undefined || original === "") {
+    return {
+      value: "",
+      original: "",
+      valid: true,
+      changed: false,
+      warning: "",
+      error: ""
+    };
+  }
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const normalized = isoDateFromParts(
+      value.getFullYear(),
+      value.getMonth() + 1,
+      value.getDate()
+    );
+
+    return {
+      value: normalized,
+      original,
+      valid: Boolean(normalized),
+      changed: Boolean(normalized),
+      warning: normalized ? `${label}: se normalizó automáticamente a ${normalized}.` : "",
+      error: normalized ? "" : `${label}: la fecha recibida desde Excel no es válida.`
+    };
+  }
+
+  if (typeof value === "number") {
+    const normalized = excelSerialToISO(value);
+
+    return {
+      value: normalized,
+      original,
+      valid: Boolean(normalized),
+      changed: Boolean(normalized),
+      warning: normalized ? `${label}: Excel guardó la fecha como número (${original}) y se convirtió a ${normalized}.` : "",
+      error: normalized ? "" : `${label}: el número ${original} no corresponde a una fecha válida de Excel.`
+    };
+  }
+
+  const text = original.replace(/ /g, " ").trim();
+  const lower = normalizeText(text);
+
+  if (/^(#value!|#num!|#n\/a|n\/a|na|error|fecha invalida|fecha inválida|#####)$/.test(lower)) {
+    return {
+      value: "",
+      original,
+      valid: false,
+      changed: false,
+      warning: "",
+      error: `${label}: Excel reporta «${original}». Revisa la celda de origen o selecciona una fecha válida.`
+    };
+  }
+
+  if (/^\d{4,5}(?:[.,]\d+)?$/.test(text)) {
+    const normalized = excelSerialToISO(text.replace(",", "."));
+
+    if (normalized) {
+      return {
+        value: normalized,
+        original,
+        valid: true,
+        changed: normalized !== original,
+        warning: `${label}: se interpretó «${original}» como fecha de Excel y se convirtió a ${normalized}.`,
+        error: ""
+      };
+    }
+  }
+
+  let match = text.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})(?:[ T].*)?$/);
+
+  if (match) {
+    const normalized = isoDateFromParts(match[1], match[2], match[3]);
+
+    return {
+      value: normalized,
+      original,
+      valid: Boolean(normalized),
+      changed: Boolean(normalized && normalized !== text),
+      warning: normalized && normalized !== text ? `${label}: se normalizó «${original}» a ${normalized}.` : "",
+      error: normalized ? "" : `${label}: «${original}» no corresponde a una fecha real.`
+    };
+  }
+
+  match = text.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2}|\d{4})(?:[ T].*)?$/);
+
+  if (match) {
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    const year = normalizeImportYear(match[3]);
+    const normalized = isoDateFromParts(year, month, day);
+    const ambiguous = day <= 12 && month <= 12;
+
+    return {
+      value: normalized,
+      original,
+      valid: Boolean(normalized),
+      changed: Boolean(normalized),
+      warning: normalized
+        ? `${label}: se convirtió «${original}» a ${normalized}${ambiguous ? " interpretando el formato como día/mes/año" : ""}.`
+        : "",
+      error: normalized
+        ? ""
+        : `${label}: «${original}» no corresponde a una fecha real. Usa AAAA-MM-DD o DD/MM/AAAA.`
+    };
+  }
+
+  const monthNames = {
+    ene: 1, enero: 1, jan: 1, january: 1,
+    feb: 2, febrero: 2, february: 2,
+    mar: 3, marzo: 3, march: 3,
+    abr: 4, abril: 4, apr: 4, april: 4,
+    may: 5, mayo: 5,
+    jun: 6, junio: 6, june: 6,
+    jul: 7, julio: 7, july: 7,
+    ago: 8, agosto: 8, aug: 8, august: 8,
+    sep: 9, sept: 9, septiembre: 9, september: 9,
+    oct: 10, octubre: 10, october: 10,
+    nov: 11, noviembre: 11, november: 11,
+    dic: 12, diciembre: 12, dec: 12, december: 12
+  };
+
+  match = lower.match(/^(\d{1,2})[\s\-]+([a-z]+)[\s\-,]+(\d{2}|\d{4})(?:\s.*)?$/);
+
+  if (match && monthNames[match[2]]) {
+    const normalized = isoDateFromParts(
+      normalizeImportYear(match[3]),
+      monthNames[match[2]],
+      Number(match[1])
+    );
+
+    return {
+      value: normalized,
+      original,
+      valid: Boolean(normalized),
+      changed: Boolean(normalized),
+      warning: normalized ? `${label}: se convirtió «${original}» a ${normalized}.` : "",
+      error: normalized ? "" : `${label}: «${original}» no corresponde a una fecha real.`
+    };
+  }
+
+  return {
+    value: "",
+    original,
+    valid: false,
+    changed: false,
+    warning: "",
+    error: `${label}: no se reconoce «${original}». Formatos admitidos: 2026-12-31, 31/12/2026 o una fecha real de Excel.`
+  };
 }
 
 function normalizeBoolean(value) {
@@ -1474,6 +1673,14 @@ function normalizeImportRow(raw) {
   const tipo_unidad = ["actividad", "actividad_general", "actividad general", "general"].includes(rawType)
     ? "actividad_general"
     : "proyecto";
+  const fechaInicioMeta = normalizeImportDate(
+    pick("fecha_inicio", "inicio"),
+    "Fecha de inicio"
+  );
+  const fechaFinMeta = normalizeImportDate(
+    pick("fecha_fin", "fin", "cierre"),
+    "Fecha de cierre"
+  );
 
   return {
     codigo: String(pick("codigo", "código") || "").trim(),
@@ -1491,12 +1698,12 @@ function normalizeImportRow(raw) {
     responsable: String(
       pick("responsable", "coordinador", "manager") || ""
     ).trim(),
-    fecha_inicio: String(
-      pick("fecha_inicio", "inicio") || ""
-    ).trim(),
-    fecha_fin: String(
-      pick("fecha_fin", "fin", "cierre") || ""
-    ).trim(),
+    fecha_inicio: fechaInicioMeta.value,
+    fecha_fin: fechaFinMeta.value,
+    dateMeta: {
+      fecha_inicio: fechaInicioMeta,
+      fecha_fin: fechaFinMeta
+    },
     estado,
     tiene_financiacion: normalizeBoolean(
       pick("tiene_financiacion", "financiado", "financiacion")
@@ -1606,12 +1813,21 @@ function validateImportRows(
       errors.push("Valor estimado inválido");
     }
 
+    [row.dateMeta?.fecha_inicio, row.dateMeta?.fecha_fin]
+      .filter(Boolean)
+      .forEach((meta) => {
+        if (meta.error) errors.push(meta.error);
+        if (meta.warning) warnings.push(meta.warning);
+      });
+
     if (
       row.fecha_inicio &&
       row.fecha_fin &&
       row.fecha_fin < row.fecha_inicio
     ) {
-      errors.push("Fechas inconsistentes");
+      errors.push(
+        `La fecha de cierre (${row.fecha_fin}) es anterior a la fecha de inicio (${row.fecha_inicio}).`
+      );
     }
 
     const mandateIds = [];
@@ -1650,40 +1866,98 @@ function validateImportRows(
   });
 }
 
+function importDateRepair(row, field, label) {
+  const meta = row.dateMeta?.[field];
+
+  if (!meta?.error) return "";
+
+  return `
+    <div class="import-date-repair">
+      <div>
+        <strong>${escapeHTML(label)}</strong>
+        <small>Valor recibido: ${escapeHTML(meta.original || "vacío")}</small>
+      </div>
+
+      <div class="import-date-repair-actions">
+        <label>
+          <span>Corregir fecha</span>
+          <input
+            type="date"
+            data-import-date-fix
+            data-row-index="${row.index - 1}"
+            data-field="${field}"
+            aria-label="Corregir ${escapeHTML(label)} de la fila ${row.index}"
+          >
+        </label>
+
+        <button
+          class="btn btn-secondary btn-small"
+          type="button"
+          data-import-date-clear
+          data-row-index="${row.index - 1}"
+          data-field="${field}"
+        >
+          Dejar sin fecha
+        </button>
+      </div>
+    </div>
+  `;
+}
+
 function importPreview(rows) {
   if (!rows.length) {
     return `<div class="empty-state">Aún no hay datos para previsualizar.</div>`;
   }
 
-  const importedWeight = rows
-    .filter((row) => row.valid)
-    .reduce(
-      (sum, row) => sum + Number(row.ponderacion || 0),
-      0
-    );
+  const validRows = rows.filter((row) => row.valid);
+  const errorRows = rows.filter((row) => !row.valid);
+  const correctedDates = rows.reduce((count, row) => {
+    return count + [row.dateMeta?.fecha_inicio, row.dateMeta?.fecha_fin]
+      .filter((meta) => meta?.valid && meta?.changed)
+      .length;
+  }, 0);
+  const importedWeight = validRows.reduce(
+    (sum, row) => sum + Number(row.ponderacion || 0),
+    0
+  );
 
   return `
     <div class="import-summary">
       <span class="status-chip active">
-        ${rows.filter((row) => row.valid).length} válidos
+        ${validRows.length} válidos
       </span>
 
-      <span class="status-chip">
-        ${rows.filter((row) => !row.valid).length} con error
+      <span class="status-chip ${errorRows.length ? "warning" : ""}">
+        ${errorRows.length} con error
       </span>
+
+      ${correctedDates
+        ? `<span class="status-chip draft">${correctedDates} ${correctedDates === 1 ? "fecha corregida" : "fechas corregidas"} automáticamente</span>`
+        : ""
+      }
 
       <span class="status-chip">
         Peso importado: ${formatPercent(importedWeight)}
       </span>
     </div>
 
+    ${errorRows.some((row) => row.dateMeta?.fecha_inicio?.error || row.dateMeta?.fecha_fin?.error)
+      ? `<div class="import-diagnostic-banner">
+          <strong>Hay fechas que necesitan revisión.</strong>
+          <p>No tienes que borrar la columna. Corrige la fecha directamente en la fila o usa <strong>Dejar sin fecha</strong> si ese dato realmente no aplica.</p>
+        </div>`
+      : ""
+    }
+
     <div class="table-wrap import-preview-wrap">
-      <table class="data-table compact-table">
+      <table class="data-table compact-table import-preview-table">
         <thead>
           <tr>
             <th>#</th>
             <th>Código</th>
             <th>Unidad</th>
+            <th>Inicio</th>
+            <th>Cierre</th>
             <th>Estado</th>
             <th>Ponderación</th>
             <th>Mandatos</th>
@@ -1696,12 +1970,21 @@ function importPreview(rows) {
             <tr class="${row.valid ? "" : "row-error"}">
               <td>${row.index}</td>
               <td>${escapeHTML(row.codigo || "—")}</td>
-              <td><strong>${escapeHTML(row.nombre || "—")}</strong><small class="import-unit-type">${row.tipo_unidad === "actividad_general" ? "Actividad general" : "Proyecto"}</small></td>
+              <td>
+                <strong>${escapeHTML(row.nombre || "—")}</strong>
+                <small class="import-unit-type">${row.tipo_unidad === "actividad_general" ? "Actividad general" : "Proyecto"}</small>
+              </td>
+              <td class="import-date-cell">
+                ${row.fecha_inicio ? `<strong>${escapeHTML(row.fecha_inicio)}</strong><small>${escapeHTML(formatDate(row.fecha_inicio))}</small>` : "—"}
+              </td>
+              <td class="import-date-cell">
+                ${row.fecha_fin ? `<strong>${escapeHTML(row.fecha_fin)}</strong><small>${escapeHTML(formatDate(row.fecha_fin))}</small>` : "—"}
+              </td>
               <td>${escapeHTML(row.estado)}</td>
               <td>${formatPercent(row.ponderacion)}</td>
               <td>${escapeHTML(row.mandatos || "—")}</td>
 
-              <td>
+              <td class="import-validation-cell">
                 ${row.errors.length
                   ? `<div class="validation-error">${escapeHTML(row.errors.join(" · "))}</div>`
                   : `<div class="validation-ok">Listo</div>`
@@ -1711,6 +1994,9 @@ function importPreview(rows) {
                   ? `<div class="validation-warning">${escapeHTML(row.warnings.join(" · "))}</div>`
                   : ""
                 }
+
+                ${importDateRepair(row, "fecha_inicio", "Fecha de inicio")}
+                ${importDateRepair(row, "fecha_fin", "Fecha de cierre")}
               </td>
             </tr>
           `).join("")}
@@ -1730,11 +2016,14 @@ function openImportProyectos({
   onImported
 }) {
   let validatedRows = [];
+  let sourceRows = [];
+  let pasteTimer = null;
 
   openModal({
     title: "Importar Proyectos / Actividades",
+    size: "wide",
     content: `
-      <div class="context-ribbon project-context-ribbon">
+      <div class="context-ribbon project-context-ribbon import-context-ribbon">
         <div>
           <span>Vigencia</span>
           <strong>${escapeHTML(vigencia.nombre)}</strong>
@@ -1756,80 +2045,109 @@ function openImportProyectos({
         </div>
       </div>
 
-      <div class="danger-callout soft-callout">
-        <strong>La importación se realizará únicamente en este Programa.</strong>
-        <p>
-          Después de importar revisa la ponderación total. El sistema no
-          modifica automáticamente los pesos existentes.
-        </p>
+      <div class="import-assist-callout">
+        <div>
+          <strong>Importación asistida</strong>
+          <p>El sistema valida los datos antes de guardar. Las fechas de Excel se normalizan automáticamente cuando es posible y, si alguna no se reconoce, podrás corregirla en la vista previa sin borrar toda la columna.</p>
+        </div>
       </div>
 
-      <div class="import-methods">
+      <div class="import-methods import-methods-clean">
         <section class="import-method">
-          <h3>Pegar desde una tabla</h3>
-
-          <p class="muted">
-            Copia filas desde Excel o Google Sheets.
-          </p>
+          <div class="import-method-heading">
+            <span class="import-step">1</span>
+            <div>
+              <h3>Pegar tabla</h3>
+              <p class="muted">Copia desde Excel o Google Sheets. La validación comienza al pegar.</p>
+            </div>
+          </div>
 
           <textarea
             id="pasteProjects"
             class="import-textarea"
-            placeholder="codigo&#9;nombre&#9;objetivo_general&#9;estado&#9;ponderacion&#9;mandatos"
+            placeholder="codigo&#9;nombre&#9;tipo_unidad&#9;fecha_inicio&#9;fecha_fin&#9;estado&#9;ponderacion"
           ></textarea>
 
-          <button id="parseProjectsPaste" class="btn btn-secondary" type="button">
-            Previsualizar
-          </button>
+          <small class="import-auto-hint">No necesitas pulsar otro botón: al pegar se genera la vista previa.</small>
         </section>
 
         <div class="import-divider"><span>o</span></div>
 
         <section class="import-method">
-          <h3>Importar archivo</h3>
+          <div class="import-method-heading">
+            <span class="import-step">1</span>
+            <div>
+              <h3>Cargar archivo</h3>
+              <p class="muted">CSV, XLSX o XLS. El archivo se lee inmediatamente después de seleccionarlo.</p>
+            </div>
+          </div>
 
-          <p class="muted">
-            Formatos admitidos: CSV, XLSX y XLS.
-          </p>
+          <label class="import-file-picker" for="projectsImportFile">
+            <span>Seleccionar archivo</span>
+            <small id="projectsImportFileName">Ningún archivo seleccionado</small>
+          </label>
 
           <input
             id="projectsImportFile"
-            class="file-input"
+            class="import-file-input-hidden"
             type="file"
             accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
           >
 
-          <button id="parseProjectsFile" class="btn btn-secondary" type="button">
-            Leer archivo
-          </button>
+          <small class="import-auto-hint">Las fechas reales de Excel y formatos como 31/12/2026 se convierten a AAAA-MM-DD.</small>
         </section>
       </div>
 
-      <section class="import-template">
-        <strong>Encabezados recomendados</strong>
+      <details class="import-template import-template-details">
+        <summary>Ver columnas y formatos aceptados</summary>
 
-        <code>
-          codigo | nombre | tipo_unidad | nombre_corto | descripcion | objetivo_general |
-          responsable | fecha_inicio | fecha_fin | estado | tiene_financiacion |
-          valor_estimado | ponderacion | mandatos | orden
-        </code>
+        <div class="import-template-body">
+          <strong>Encabezados recomendados</strong>
 
-        <p>
-          En <strong>tipo_unidad</strong> usa <strong>proyecto</strong> o <strong>actividad_general</strong>.
-          Para varios Mandatos usa <strong>|</strong> o <strong>;</strong>.
-          La coincidencia se hace por código o título del Mandato.
-        </p>
-      </section>
+          <code>
+            codigo | nombre | tipo_unidad | nombre_corto | descripcion | objetivo_general |
+            responsable | fecha_inicio | fecha_fin | estado | tiene_financiacion |
+            valor_estimado | ponderacion | mandatos | orden
+          </code>
+
+          <div class="import-format-grid">
+            <p>
+              <strong>Tipo de unidad</strong>
+              Usa <code>proyecto</code> o <code>actividad_general</code>.
+            </p>
+
+            <p>
+              <strong>Fechas</strong>
+              Se aceptan fechas reales de Excel, <code>AAAA-MM-DD</code> y <code>DD/MM/AAAA</code>. Si una fecha es ambigua, se interpreta con criterio día/mes/año.
+            </p>
+
+            <p>
+              <strong>Mandatos</strong>
+              Para varios usa <code>|</code> o <code>;</code>. La coincidencia se hace por código o título.
+            </p>
+          </div>
+        </div>
+      </details>
 
       <p id="projectsImportMessage" class="form-message"></p>
 
-      <div id="projectsImportPreview">
-        <div class="empty-state">
-          Pega una tabla o selecciona un archivo para comenzar.
+      <section class="import-preview-section">
+        <div class="import-preview-heading">
+          <div>
+            <span class="eyebrow">Paso 2</span>
+            <h3>Revisar antes de importar</h3>
+          </div>
+          <small>Solo se guardarán las filas marcadas como válidas.</small>
         </div>
-      </div>
 
-      <div class="form-actions sticky-actions">
+        <div id="projectsImportPreview">
+          <div class="empty-state import-empty-state">
+            Pega una tabla o selecciona un archivo. La vista previa aparecerá automáticamente.
+          </div>
+        </div>
+      </section>
+
+      <div class="form-actions sticky-actions import-sticky-actions">
         <button id="cancelProjectsImport" class="btn btn-secondary" type="button">
           Cancelar
         </button>
@@ -1842,93 +2160,151 @@ function openImportProyectos({
   });
 
   const paste = document.querySelector("#pasteProjects");
-  const fileInput =
-    document.querySelector("#projectsImportFile");
-  const preview =
-    document.querySelector("#projectsImportPreview");
-  const message =
-    document.querySelector("#projectsImportMessage");
-  const confirm =
-    document.querySelector("#confirmProjectsImport");
+  const fileInput = document.querySelector("#projectsImportFile");
+  const fileName = document.querySelector("#projectsImportFileName");
+  const preview = document.querySelector("#projectsImportPreview");
+  const message = document.querySelector("#projectsImportMessage");
+  const confirm = document.querySelector("#confirmProjectsImport");
+
+  function bindDateRepairs() {
+    preview
+      .querySelectorAll("[data-import-date-fix]")
+      .forEach((input) => {
+        input.addEventListener("change", () => {
+          const rowIndex = Number(input.dataset.rowIndex);
+          const field = input.dataset.field;
+
+          if (!Number.isInteger(rowIndex) || !field || !input.value || !sourceRows[rowIndex]) return;
+
+          sourceRows[rowIndex][field] = input.value;
+          message.textContent = "Fecha corregida. La fila se validó nuevamente.";
+          setRows(sourceRows);
+        });
+      });
+
+    preview
+      .querySelectorAll("[data-import-date-clear]")
+      .forEach((button) => {
+        button.addEventListener("click", () => {
+          const rowIndex = Number(button.dataset.rowIndex);
+          const field = button.dataset.field;
+
+          if (!Number.isInteger(rowIndex) || !field || !sourceRows[rowIndex]) return;
+
+          sourceRows[rowIndex][field] = "";
+          message.textContent = "La fecha se dejó vacía y la fila se validó nuevamente.";
+          setRows(sourceRows);
+        });
+      });
+  }
 
   function setRows(rawRows) {
+    sourceRows = rawRows.map((row) => ({ ...row }));
     validatedRows = validateImportRows(
-      rawRows,
+      sourceRows,
       existingProjects,
       mandatos
     );
 
     preview.innerHTML = importPreview(validatedRows);
+    bindDateRepairs();
 
-    const validCount =
-      validatedRows.filter((row) => row.valid).length;
+    const validCount = validatedRows.filter((row) => row.valid).length;
+    const errorCount = validatedRows.length - validCount;
 
     confirm.disabled = validCount === 0;
-
     confirm.textContent = validCount
       ? `Importar ${validCount} ${validCount === 1 ? "unidad" : "unidades"}`
       : "Importar registros válidos";
+
+    if (errorCount) {
+      message.textContent = `${validCount} ${validCount === 1 ? "fila lista" : "filas listas"} y ${errorCount} ${errorCount === 1 ? "fila requiere revisión" : "filas requieren revisión"}.`;
+    } else if (validatedRows.length) {
+      message.textContent = `Todo listo: ${validatedRows.length} ${validatedRows.length === 1 ? "fila válida" : "filas válidas"}.`;
+    }
+  }
+
+  function parsePastedRows() {
+    const text = paste.value;
+
+    if (!text.trim()) {
+      sourceRows = [];
+      validatedRows = [];
+      confirm.disabled = true;
+      confirm.textContent = "Importar registros válidos";
+      message.textContent = "";
+      preview.innerHTML = `
+        <div class="empty-state import-empty-state">
+          Pega una tabla o selecciona un archivo. La vista previa aparecerá automáticamente.
+        </div>
+      `;
+      return;
+    }
+
+    const rows = parseDelimitedText(text);
+
+    if (!rows.length) {
+      message.textContent = "No se detectaron filas para importar. Comprueba que la primera fila contenga encabezados.";
+      return;
+    }
+
+    setRows(rows);
+  }
+
+  async function loadSelectedFile() {
+    message.textContent = "";
+
+    const file = fileInput.files?.[0];
+
+    if (!file) {
+      fileName.textContent = "Ningún archivo seleccionado";
+      return;
+    }
+
+    fileName.textContent = file.name;
+    message.textContent = `Analizando ${file.name}…`;
+
+    try {
+      const extension = file.name.split(".").pop()?.toLowerCase();
+
+      if (!["csv", "xlsx", "xls"].includes(extension || "")) {
+        throw new Error("Formato no admitido. Usa un archivo CSV, XLSX o XLS.");
+      }
+
+      const rows = extension === "csv"
+        ? parseDelimitedText(await file.text())
+        : await readSpreadsheetFile(file);
+
+      if (!rows.length) {
+        message.textContent = "El archivo no contiene filas utilizables. Comprueba la primera hoja y los encabezados.";
+        return;
+      }
+
+      paste.value = "";
+      setRows(rows);
+    } catch (error) {
+      console.error(error);
+      message.textContent = friendlyErrorMessage(error, "No fue posible leer el archivo.");
+    }
   }
 
   document
     .querySelector("#cancelProjectsImport")
     .addEventListener("click", closeModal);
 
-  document
-    .querySelector("#parseProjectsPaste")
-    .addEventListener("click", () => {
-      message.textContent = "";
+  paste.addEventListener("paste", () => {
+    window.setTimeout(parsePastedRows, 0);
+  });
 
-      const rows = parseDelimitedText(paste.value);
+  paste.addEventListener("input", () => {
+    window.clearTimeout(pasteTimer);
+    pasteTimer = window.setTimeout(parsePastedRows, 350);
+  });
 
-      if (!rows.length) {
-        message.textContent =
-          "No se detectaron filas para importar.";
-        return;
-      }
-
-      setRows(rows);
-    });
-
-  document
-    .querySelector("#parseProjectsFile")
-    .addEventListener("click", async () => {
-      message.textContent = "";
-
-      const file = fileInput.files?.[0];
-
-      if (!file) {
-        message.textContent =
-          "Selecciona primero un archivo.";
-        return;
-      }
-
-      try {
-        const extension =
-          file.name.split(".").pop()?.toLowerCase();
-
-        const rows = extension === "csv"
-          ? parseDelimitedText(await file.text())
-          : await readSpreadsheetFile(file);
-
-        if (!rows.length) {
-          message.textContent =
-            "El archivo no contiene filas utilizables.";
-          return;
-        }
-
-        setRows(rows);
-      } catch (error) {
-        console.error(error);
-
-        message.textContent =
-          friendlyErrorMessage(error, "No fue posible leer el archivo.");
-      }
-    });
+  fileInput.addEventListener("change", loadSelectedFile);
 
   confirm.addEventListener("click", async () => {
-    const validRows =
-      validatedRows.filter((row) => row.valid);
+    const validRows = validatedRows.filter((row) => row.valid);
 
     if (!validRows.length) return;
 
@@ -1958,8 +2334,12 @@ function openImportProyectos({
           orden: row.orden,
           tipo_unidad: row.tipo_unidad
         };
-        if (row.tipo_unidad === "actividad_general") await createActividadGeneral(payload, row.mandateIds);
-        else await createProyecto(payload, row.mandateIds);
+
+        if (row.tipo_unidad === "actividad_general") {
+          await createActividadGeneral(payload, row.mandateIds);
+        } else {
+          await createProyecto(payload, row.mandateIds);
+        }
 
         imported++;
       }
@@ -1968,10 +2348,7 @@ function openImportProyectos({
       await onImported(imported);
     } catch (error) {
       console.error(error);
-
-      message.textContent =
-        friendlyErrorMessage(error, "No fue posible completar la importación.");
-
+      message.textContent = friendlyErrorMessage(error, "No fue posible completar la importación.");
       confirm.disabled = false;
       confirm.textContent = "Importar registros válidos";
     }
