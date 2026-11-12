@@ -1,9 +1,9 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.16";
-import { updateWithVersion } from "../security.js?v=5.4.16";
-import { openModal, closeModal } from "../components/modal.js?v=5.4.16";
-import { renderProyectoWorkspace } from "./proyectoWorkspace.js?v=5.4.16";
-import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.16";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.4.16";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.17";
+import { updateWithVersion, isAdmin } from "../security.js?v=5.4.17";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.17";
+import { renderProyectoWorkspace } from "./proyectoWorkspace.js?v=5.4.17";
+import { setAuditContext, openAuditPanel } from "./auditoria.js?v=5.4.17";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.17";
 
 function escapeHTML(value = "") {
   return String(value ?? "")
@@ -374,6 +374,33 @@ async function updateProyecto(record, payload, mandatoIds = null) {
   }
 
   return data;
+}
+
+async function getProgramUnitSummary(programaId) {
+  const supabase = requireSupabase();
+  const { data, error } = await supabase
+    .from("proyectos")
+    .select("id,ponderacion,tipo_unidad")
+    .eq("programa_id", programaId);
+
+  if (error) throw error;
+
+  const rows = data || [];
+  return {
+    count: rows.length,
+    totalWeight: calculateWeightTotal(rows)
+  };
+}
+
+async function moveUnitsToProgram(unitIds, destinationProgramId) {
+  const supabase = requireSupabase();
+  const { data, error } = await supabase.rpc("app_reubicar_unidades", {
+    p_unidad_ids: unitIds,
+    p_programa_destino_id: destinationProgramId
+  });
+
+  if (error) throw error;
+  return data || [];
 }
 
 async function createActividadGeneral(payload, mandatoIds = []) {
@@ -2367,6 +2394,8 @@ export async function renderProyectos(container, navigationTarget = null) {
   let proyectos = [];
   let mandatos = [];
   let unitFilter = "todos";
+  const adminMode = isAdmin();
+  const selectedMoveIds = new Set();
 
   let selectedVigenciaId = "";
   let selectedVigenciaConsejeriaId = "";
@@ -2388,6 +2417,12 @@ export async function renderProyectos(container, navigationTarget = null) {
         <button id="importProjectsButton" class="btn btn-secondary" type="button" disabled>
           Importar
         </button>
+
+        ${adminMode ? `
+          <button id="moveUnitsButton" class="btn btn-secondary" type="button" disabled>
+            Mover seleccionadas
+          </button>
+        ` : ""}
 
         <button id="weightsProjectsButton" class="btn btn-secondary" type="button" disabled>
           ${scaleIcon()}
@@ -2457,6 +2492,16 @@ export async function renderProyectos(container, navigationTarget = null) {
         <button class="unit-filter-tab" data-unit-filter="proyecto" type="button">Proyectos <span id="unitCountProjects">0</span></button>
         <button class="unit-filter-tab" data-unit-filter="actividad_general" type="button">Actividades generales <span id="unitCountActivities">0</span></button>
       </div>
+      ${adminMode ? `
+        <div id="unitMoveToolbar" class="unit-move-toolbar hidden">
+          <label class="unit-select-all">
+            <input id="selectAllVisibleUnits" type="checkbox">
+            <span>Seleccionar visibles</span>
+          </label>
+          <span id="unitMoveSelectionCount" class="muted">0 seleccionadas</span>
+          <small>Administrador · Puedes reubicar Proyectos y Actividades generales dentro de esta Consejería.</small>
+        </div>
+      ` : ""}
       <div id="projectsContent" style="margin-top: 18px">
         <div class="empty-state">
           <strong>Selecciona un Programa.</strong>
@@ -2500,6 +2545,18 @@ export async function renderProyectos(container, navigationTarget = null) {
 
   const newButton =
     listView.querySelector("#newProjectButton");
+
+  const moveButton =
+    listView.querySelector("#moveUnitsButton");
+
+  const moveToolbar =
+    listView.querySelector("#unitMoveToolbar");
+
+  const selectAllVisible =
+    listView.querySelector("#selectAllVisibleUnits");
+
+  const moveSelectionCount =
+    listView.querySelector("#unitMoveSelectionCount");
 
   const content =
     listView.querySelector("#projectsContent");
@@ -2552,6 +2609,211 @@ export async function renderProyectos(container, navigationTarget = null) {
     );
   }
 
+  function selectedMoveRecords() {
+    return proyectos.filter((item) => selectedMoveIds.has(item.id));
+  }
+
+  function syncMoveSelectionUI(visibleUnits = null) {
+    if (!adminMode) return;
+
+    const selected = selectedMoveRecords();
+    const visible = visibleUnits || (unitFilter === "todos"
+      ? proyectos
+      : proyectos.filter((item) => unitType(item) === unitFilter));
+
+    if (moveButton) {
+      moveButton.disabled = selected.length === 0;
+      moveButton.textContent = selected.length
+        ? `Mover seleccionadas (${selected.length})`
+        : "Mover seleccionadas";
+    }
+
+    if (moveSelectionCount) {
+      moveSelectionCount.textContent = `${selected.length} ${selected.length === 1 ? "seleccionada" : "seleccionadas"}`;
+    }
+
+    if (moveToolbar) {
+      moveToolbar.classList.toggle("hidden", proyectos.length === 0);
+    }
+
+    if (selectAllVisible) {
+      const visibleIds = visible.map((item) => item.id);
+      const selectedVisible = visibleIds.filter((id) => selectedMoveIds.has(id)).length;
+      selectAllVisible.checked = visibleIds.length > 0 && selectedVisible === visibleIds.length;
+      selectAllVisible.indeterminate = selectedVisible > 0 && selectedVisible < visibleIds.length;
+    }
+  }
+
+  async function openMoveUnitsDialog(records) {
+    if (!adminMode || !records.length) return;
+
+    const originPrograma = currentPrograma();
+    const originLinea = currentLinea();
+    if (!originPrograma || !originLinea) return;
+
+    const selectedWeight = calculateWeightTotal(records);
+    const originTotal = calculateWeightTotal(proyectos);
+
+    openModal({
+      title: records.length === 1 ? "Mover unidad" : `Mover ${records.length} unidades`,
+      size: "large",
+      content: `
+        <div class="unit-move-dialog">
+          <div class="unit-move-origin">
+            <span class="context-label">Ubicación actual</span>
+            <strong>${escapeHTML(originLinea.nombre)}</strong>
+            <small>${escapeHTML(originPrograma.nombre)}</small>
+          </div>
+
+          <div class="unit-move-selected-list">
+            ${records.map((record) => `
+              <div>
+                ${unitTypeChip(record)}
+                <span>${escapeHTML(record.nombre)}</span>
+                <strong>${formatPercent(record.ponderacion)}</strong>
+              </div>
+            `).join("")}
+          </div>
+
+          <div class="form-grid two-cols unit-move-destination">
+            <div class="form-field">
+              <label for="moveDestinationLine">Línea de Acción destino</label>
+              <select id="moveDestinationLine">
+                <option value="">Selecciona una Línea…</option>
+                ${lineas.map((item) => option(item.id, item.nombre)).join("")}
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="moveDestinationProgram">Programa destino</label>
+              <select id="moveDestinationProgram" disabled>
+                <option value="">Selecciona una Línea primero</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="moveWeightImpact" class="unit-move-impact muted">
+            Selecciona el Programa destino para revisar el efecto sobre la ponderación.
+          </div>
+
+          <div class="form-message info">
+            Se conservarán Planeador, actividades internas, indicadores, avances, seguimientos, evidencias, presupuesto y Mandatos. Solo cambia el Programa padre.
+          </div>
+
+          <div id="moveUnitsMessage" class="form-message"></div>
+
+          <div class="modal-actions">
+            <button id="cancelMoveUnits" class="btn btn-secondary" type="button">Cancelar</button>
+            <button id="confirmMoveUnits" class="btn btn-primary" type="button" disabled>
+              ${records.length === 1 ? "Mover unidad" : `Mover ${records.length} unidades`}
+            </button>
+          </div>
+        </div>
+      `
+    });
+
+    const lineSelect = document.querySelector("#moveDestinationLine");
+    const programSelect = document.querySelector("#moveDestinationProgram");
+    const impact = document.querySelector("#moveWeightImpact");
+    const message = document.querySelector("#moveUnitsMessage");
+    const confirm = document.querySelector("#confirmMoveUnits");
+    const cancel = document.querySelector("#cancelMoveUnits");
+
+    let destinationPrograms = [];
+    let destinationSummary = null;
+
+    cancel?.addEventListener("click", closeModal);
+
+    lineSelect?.addEventListener("change", async () => {
+      const lineId = lineSelect.value;
+      programSelect.disabled = true;
+      confirm.disabled = true;
+      impact.textContent = "Cargando Programas…";
+
+      if (!lineId) {
+        programSelect.innerHTML = `<option value="">Selecciona una Línea primero</option>`;
+        impact.textContent = "Selecciona el Programa destino para revisar el efecto sobre la ponderación.";
+        return;
+      }
+
+      try {
+        destinationPrograms = await getProgramas(lineId);
+        const available = destinationPrograms.filter((item) => item.id !== originPrograma.id);
+        programSelect.innerHTML = available.length
+          ? `<option value="">Selecciona un Programa…</option>${available.map((item) => option(item.id, item.nombre)).join("")}`
+          : `<option value="">No hay otro Programa disponible en esta Línea</option>`;
+        programSelect.disabled = available.length === 0;
+        impact.textContent = available.length
+          ? "Selecciona el Programa destino para revisar el efecto sobre la ponderación."
+          : "Esta Línea no tiene un Programa diferente al actual.";
+      } catch (error) {
+        console.error(error);
+        programSelect.innerHTML = `<option value="">No fue posible cargar los Programas</option>`;
+        impact.textContent = friendlyErrorMessage(error, "No fue posible cargar los Programas destino.");
+      }
+    });
+
+    programSelect?.addEventListener("change", async () => {
+      confirm.disabled = true;
+      destinationSummary = null;
+      const targetId = programSelect.value;
+
+      if (!targetId) {
+        impact.textContent = "Selecciona el Programa destino para revisar el efecto sobre la ponderación.";
+        return;
+      }
+
+      try {
+        destinationSummary = await getProgramUnitSummary(targetId);
+        const targetProgram = destinationPrograms.find((item) => item.id === targetId);
+        const originAfter = originTotal - selectedWeight;
+        const destinationAfter = destinationSummary.totalWeight + selectedWeight;
+        const originState = weightState(originAfter);
+        const destinationState = weightState(destinationAfter);
+
+        impact.innerHTML = `
+          <div>
+            <span>Programa actual después del movimiento</span>
+            <strong>${formatPercent(originAfter)}</strong>
+            <small>${escapeHTML(originState.label)}</small>
+          </div>
+          <div>
+            <span>${escapeHTML(targetProgram?.nombre || "Programa destino")}</span>
+            <strong>${formatPercent(destinationAfter)}</strong>
+            <small>${escapeHTML(destinationState.label)}</small>
+          </div>
+          <p>Las ponderaciones se conservan. Si alguno de los Programas deja de sumar 100 %, revísalo desde <strong>Ponderaciones</strong>.</p>
+        `;
+        confirm.disabled = false;
+      } catch (error) {
+        console.error(error);
+        impact.textContent = friendlyErrorMessage(error, "No fue posible calcular el efecto de la reubicación.");
+      }
+    });
+
+    confirm?.addEventListener("click", async () => {
+      const targetId = programSelect.value;
+      if (!targetId) return;
+
+      confirm.disabled = true;
+      confirm.textContent = "Moviendo…";
+      message.textContent = "";
+
+      try {
+        const moved = await moveUnitsToProgram(records.map((item) => item.id), targetId);
+        selectedMoveIds.clear();
+        closeModal();
+        await refreshProjects();
+        showToast(`${moved.length} ${moved.length === 1 ? "unidad reubicada" : "unidades reubicadas"}. Revisa las ponderaciones de los Programas involucrados.`);
+      } catch (error) {
+        console.error(error);
+        message.textContent = friendlyErrorMessage(error, "No fue posible mover las unidades seleccionadas.");
+        confirm.disabled = false;
+        confirm.textContent = records.length === 1 ? "Mover unidad" : `Mover ${records.length} unidades`;
+      }
+    });
+  }
+
   function updateActions() {
     const hasContext = Boolean(
       selectedVigenciaId &&
@@ -2568,6 +2830,8 @@ export async function renderProyectos(container, navigationTarget = null) {
 
     weightsButton.disabled =
       !hasContext || proyectos.length === 0;
+
+    syncMoveSelectionUI();
   }
 
   function renderContextSummary() {
@@ -2654,6 +2918,7 @@ export async function renderProyectos(container, navigationTarget = null) {
     programas = [];
     proyectos = [];
     mandatos = [];
+    selectedMoveIds.clear();
 
     count.textContent = "0";
 
@@ -2732,6 +2997,7 @@ export async function renderProyectos(container, navigationTarget = null) {
     programas = [];
     proyectos = [];
     mandatos = [];
+    selectedMoveIds.clear();
 
     count.textContent = "0";
 
@@ -2802,6 +3068,7 @@ export async function renderProyectos(container, navigationTarget = null) {
   async function loadProgramas() {
     selectedProgramaId = "";
     proyectos = [];
+    selectedMoveIds.clear();
 
     count.textContent = "0";
     renderContextSummary();
@@ -2924,6 +3191,9 @@ export async function renderProyectos(container, navigationTarget = null) {
       `<div class="empty-state">Cargando Proyectos…</div>`;
 
     proyectos = await getProyectos(programa.id);
+    [...selectedMoveIds].forEach((id) => {
+      if (!proyectos.some((item) => item.id === id)) selectedMoveIds.delete(id);
+    });
 
     count.textContent = String(proyectos.length);
     updateActions();
@@ -3027,7 +3297,15 @@ export async function renderProyectos(container, navigationTarget = null) {
                   <h3>${escapeHTML(proyecto.nombre)}</h3>
                 </div>
 
-                <div class="project-card-chips">${unitTypeChip(proyecto)}${statusChip(proyecto.estado)}</div>
+                <div class="project-card-side">
+                  ${adminMode ? `
+                    <label class="project-move-check" title="Seleccionar para reubicar">
+                      <input class="select-unit-move" type="checkbox" data-id="${proyecto.id}" ${selectedMoveIds.has(proyecto.id) ? "checked" : ""}>
+                      <span class="sr-only">Seleccionar ${escapeHTML(proyecto.nombre)}</span>
+                    </label>
+                  ` : ""}
+                  <div class="project-card-chips">${unitTypeChip(proyecto)}${statusChip(proyecto.estado)}</div>
+                </div>
               </div>
 
               <p class="muted project-card-description">
@@ -3128,6 +3406,7 @@ export async function renderProyectos(container, navigationTarget = null) {
                   ${unitType(proyecto) === "actividad_general" ? "Convertir en Proyecto" : "Convertir en Actividad"}
                 </button>
 
+
                 <button
                   class="icon-btn danger delete-project"
                   type="button"
@@ -3153,6 +3432,20 @@ export async function renderProyectos(container, navigationTarget = null) {
         </p>
       </div>
     `;
+
+    if (adminMode) {
+      content.querySelectorAll(".select-unit-move").forEach((checkbox) => {
+        checkbox.addEventListener("change", () => {
+          const id = checkbox.dataset.id;
+          if (checkbox.checked) selectedMoveIds.add(id);
+          else selectedMoveIds.delete(id);
+          syncMoveSelectionUI(visibleUnits);
+        });
+      });
+
+
+      syncMoveSelectionUI(visibleUnits);
+    }
 
     content
       .querySelectorAll(".open-project")
@@ -3273,6 +3566,31 @@ export async function renderProyectos(container, navigationTarget = null) {
         await openProjectWorkspaceRecord(targetProject, target);
       }
     }
+  }
+
+  if (adminMode) {
+    selectAllVisible?.addEventListener("change", () => {
+      const visible = unitFilter === "todos"
+        ? proyectos
+        : proyectos.filter((item) => unitType(item) === unitFilter);
+
+      visible.forEach((item) => {
+        if (selectAllVisible.checked) selectedMoveIds.add(item.id);
+        else selectedMoveIds.delete(item.id);
+      });
+
+      content.querySelectorAll(".select-unit-move").forEach((checkbox) => {
+        if (visible.some((item) => item.id === checkbox.dataset.id)) {
+          checkbox.checked = selectAllVisible.checked;
+        }
+      });
+      syncMoveSelectionUI(visible);
+    });
+
+    moveButton?.addEventListener("click", () => {
+      const records = selectedMoveRecords();
+      if (records.length) openMoveUnitsDialog(records);
+    });
   }
 
   vigenciaSelector.addEventListener(

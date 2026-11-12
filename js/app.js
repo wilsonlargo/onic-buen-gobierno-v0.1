@@ -1,22 +1,22 @@
-import { supabaseClient, isSupabaseConfigured } from "./supabaseClient.js?v=5.4.16";
-import { renderInicio } from "./modules/inicio.js?v=5.4.16";
-import { renderVigencias } from "./modules/vigencias.js?v=5.4.16";
-import { renderConsejerias } from "./modules/consejerias.js?v=5.4.16";
-import { renderMandatos } from "./modules/mandatos.js?v=5.4.16";
-import { renderSeguimientoMandatos } from "./modules/seguimientoMandatos.js?v=5.4.16";
-import { renderMiTrabajo } from "./modules/miTrabajo.js?v=5.4.16";
-import { renderControlCalidad } from "./modules/controlCalidad.js?v=5.4.16";
-import { initGlobalSearch } from "./modules/buscadorGlobal.js?v=5.4.16";
-import { renderLineas } from "./modules/lineas.js?v=5.4.16";
-import { renderProgramas } from "./modules/programas.js?v=5.4.16";
-import { renderProyectos } from "./modules/proyectos.js?v=5.4.16";
-import { renderPonderaciones } from "./modules/ponderaciones.js?v=5.4.16";
-import { renderCortesSeguimiento } from "./modules/cortesSeguimiento.js?v=5.4.16";
-import { renderAlertasTareas } from "./modules/alertasTareas.js?v=5.4.16";
-import { renderHistorial } from "./modules/historial.js?v=5.4.16";
-import { renderUsuarios } from "./modules/usuarios.js?v=5.4.16";
-import { renderConfiguracion } from "./modules/configuracion.js?v=5.4.16";
-import { initAuditoria, clearAuditContext } from "./modules/auditoria.js?v=5.4.16";
+import { supabaseClient, isSupabaseConfigured } from "./supabaseClient.js?v=5.4.17";
+import { renderInicio } from "./modules/inicio.js?v=5.4.17";
+import { renderVigencias } from "./modules/vigencias.js?v=5.4.17";
+import { renderConsejerias } from "./modules/consejerias.js?v=5.4.17";
+import { renderMandatos } from "./modules/mandatos.js?v=5.4.17";
+import { renderSeguimientoMandatos } from "./modules/seguimientoMandatos.js?v=5.4.17";
+import { renderMiTrabajo } from "./modules/miTrabajo.js?v=5.4.17";
+import { renderControlCalidad } from "./modules/controlCalidad.js?v=5.4.17";
+import { initGlobalSearch } from "./modules/buscadorGlobal.js?v=5.4.17";
+import { renderLineas } from "./modules/lineas.js?v=5.4.17";
+import { renderProgramas } from "./modules/programas.js?v=5.4.17";
+import { renderProyectos } from "./modules/proyectos.js?v=5.4.17";
+import { renderPonderaciones } from "./modules/ponderaciones.js?v=5.4.17";
+import { renderCortesSeguimiento } from "./modules/cortesSeguimiento.js?v=5.4.17";
+import { renderAlertasTareas } from "./modules/alertasTareas.js?v=5.4.17";
+import { renderHistorial } from "./modules/historial.js?v=5.4.17";
+import { renderUsuarios } from "./modules/usuarios.js?v=5.4.17";
+import { renderConfiguracion } from "./modules/configuracion.js?v=5.4.17";
+import { initAuditoria, clearAuditContext } from "./modules/auditoria.js?v=5.4.17";
 import {
   loadCurrentUserProfile,
   clearSecuritySession,
@@ -27,8 +27,8 @@ import {
   applyViewPermissions,
   startPermissionObserver,
   logSessionEvent
-} from "./security.js?v=5.4.16";
-import { friendlyErrorMessage } from "./userMessages.js?v=5.4.16";
+} from "./security.js?v=5.4.17";
+import { friendlyErrorMessage } from "./userMessages.js?v=5.4.17";
 import {
   initUserInterface,
   enhanceUserInterface,
@@ -37,7 +37,7 @@ import {
   setInterfaceView,
   confirmNavigationAway,
   clearInterfaceDirtyState
-} from "./components/uiSystem.js?v=5.4.16";
+} from "./components/uiSystem.js?v=5.4.17";
 
 const loginView = document.querySelector("#loginView");
 const appView = document.querySelector("#appView");

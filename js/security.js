@@ -1,4 +1,4 @@
-import { requireSupabase } from "./supabaseClient.js?v=5.4.16";
+import { requireSupabase } from "./supabaseClient.js?v=5.4.17";
 
 let currentProfile = null;
 let currentAssignments = [];

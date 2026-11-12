@@ -1,18 +1,18 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.16";
-import { updateWithVersion, logManualEvent } from "../security.js?v=5.4.16";
-import { openModal, closeModal } from "../components/modal.js?v=5.4.16";
-import { setAuditContext } from "./auditoria.js?v=5.4.16";
-import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.16";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.17";
+import { updateWithVersion, logManualEvent } from "../security.js?v=5.4.17";
+import { openModal, closeModal } from "../components/modal.js?v=5.4.17";
+import { setAuditContext } from "./auditoria.js?v=5.4.17";
+import { openDocumentReportDialog, documentReportIcon } from "./documentReports.js?v=5.4.17";
 import {
   formatConsejeriaProgress,
   getConsejeriaProgressState
-} from "./consejeriaProgress.js?v=5.4.16";
-import { friendlyErrorMessage } from "../userMessages.js?v=5.4.16";
+} from "./consejeriaProgress.js?v=5.4.17";
+import { friendlyErrorMessage } from "../userMessages.js?v=5.4.17";
 import {
   getConsejeriaPlannerData,
   renderConsejeriaPlanner,
   exportConsejeriaPlanner
-} from "./consejeriaPlanner.js?v=5.4.16";
+} from "./consejeriaPlanner.js?v=5.4.17";
 
 function escapeHTML(value = "") {
   return String(value ?? "")

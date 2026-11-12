@@ -1,4 +1,4 @@
-import { requireSupabase } from "../supabaseClient.js?v=5.4.16";
+import { requireSupabase } from "../supabaseClient.js?v=5.4.17";
 
 const COLORS = [
   { value: "", label: "Automático", hex: "#4f7f67" },
